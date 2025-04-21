@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>holon</title>
+    <title>shikigami</title>
     <style>
 	:root {
     /* カラーパレット (元のスタイルシートの色を定義) */
@@ -469,7 +469,7 @@ section:last-child {
 
                 <section id="text-section" class="input-section">
                     <h2>txt-input</h2>
-                    <textarea id="txt-input" rows="4" placeholder="Enter holon code..."></textarea>
+                    <textarea id="txt-input" rows="4" placeholder="Enter shikigami code..."></textarea>
                     <button id="execute-button">実行</button>
                 </section>
             </div>
@@ -660,8 +660,8 @@ section:last-child {
             }
         };
 
-        // --- Holon Interpreter ---
-        const holonInterpreter = {
+        // --- shikigami Interpreter ---
+        const shikigamiInterpreter = {
             // 変数とその値を保持する環境
             environment: {
                 global: {},
@@ -1408,7 +1408,7 @@ section:last-child {
             const code = elements.input.value;
             if (!code.trim()) return;
             try {
-                const result = holonInterpreter.execute(code);
+                const result = shikigamiInterpreter.execute(code);
                 elements.output.value = result !== undefined ? result : "実行完了";
                 elements.output.classList.add('executed');
                 setTimeout(() => elements.output.classList.remove('executed'), 300);
