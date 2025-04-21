@@ -1,0 +1,448 @@
+
+	:root {
+    /* カラーパレット (元のスタイルシートの色を定義) */
+    --color-body-bg: #f0f0f0;
+    --color-article-bg: #ffffff;
+    --color-section-border: #a0a0a0; /* Medium Grey */
+    --color-border-light: #cccccc; /* Light Grey */
+    --color-surface-light: #f8f8f8; /* Very Light Grey */
+    --color-output-executed-bg: #d1fae5; /* Light Green */
+    --color-dot-numeric-bg: #fee2e2; /* Light Pink-Red */
+    --color-dot-numeric-text: #ef4444; /* Red */
+    --color-dot-word-bg: #dbeafe; /* Light Blue */
+    --color-dot-word-text: #3b82f6; /* Blue */
+    --color-dot-detected-bg: #fca5a5; /* Pink */
+    --color-special-button-bg: #e5e7eb; /* Light Grey-Blue */
+    --color-special-button-delete-space-bg: var(--color-surface-light);
+    --color-special-button-long-pressed-bg: #fde68a; /* Light Yellow */
+    --color-special-button-combined-pressed-bg: #93c5fd; /* Light Blue */
+    --color-execute-button-bg: var(--color-dot-word-text); /* Use the same blue as word dot text */
+    --color-execute-button-hover-bg: #2563eb; /* Darker Blue */
+    --color-execute-button-active-bg: #1d4ed8; /* Even Darker Blue */
+    --color-debug-panel-bg: #f8fafc; /* Very Light Blue-Grey */
+    --color-debug-panel-border: #cbd5e1; /* Light Blue-Grey Border */
+    --color-debug-output-bg: #f1f5f9; /* Light Blue-Grey */
+    --color-text-muted: #a0a0a0; /* Muted Text Color (used for h2) */
+    --color-dot-text-muted: #aaa; /* Even Lighter Grey for default dot text */
+
+    /* スペーシング */
+    --space-xs: 5px;
+    --space-sm: 8px;
+    --space-md: 10px;
+    --space-lg: 20px;
+
+    /* サイズ */
+    --size-max-width-article: 800px;
+    --size-min-height-input-output: 80px;
+    --size-height-input-output-desktop: 500px; /* Desktop default */
+    --size-max-height-input-output: 300px;
+    --size-min-height-upper-half: 120px;
+    --size-dot: 45px;
+    --size-special-button-width: 100px;
+    --size-special-button-height: 45px;
+    --size-execute-button-width: 100px;
+    --size-min-width-control-label: 120px;
+    --size-min-width-value-display: 40px;
+    --size-max-height-debug-output: 150px;
+    --size-feedback-circle: 80px;
+    --size-feedback-text: 32px;
+
+    /* ボーダーラディウス */
+    --radius-sm: 4px;
+    --radius-md: 5px;
+    --radius-lg: 10px;
+    --radius-round: 50%;
+}
+
+
+/* Apply border-box sizing globally */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    overscroll-behavior: none;
+    text-align: center;
+    background-color: var(--color-body-bg);
+    font-family: sans-serif;
+}
+
+/* Main layout container */
+article {
+    width: 100%;
+    max-width: var(--size-max-width-article);
+    display: flex;
+    flex-direction: column;
+    margin: 0 auto;
+    background-color: var(--color-article-bg);
+    padding: var(--space-md);
+    text-align: left;
+}
+
+h1 {
+    text-align: center;
+}
+
+
+h2 {
+    text-align: left;
+    color: var(--color-text-muted); /* Original #ccc, mapping to a muted text var */
+}
+
+section {
+    border: 2px dotted var(--color-section-border);
+    padding: var(--space-md);
+    margin: var(--space-md) 0 var(--space-md) 0;
+}
+
+section:last-child {
+    margin-bottom: 0;
+}
+
+/* Style for textarea and input */
+#output,
+#txt-input {
+    width: 100%;
+    padding: var(--space-sm);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-sm);
+    display: block;
+    margin-top: var(--space-xs);
+}
+
+
+#output {
+    resize: vertical;
+    min-height: var(--size-min-height-input-output);
+    height: var(--size-height-input-output-desktop); /* Desktop default height */
+    max-height: var(--size-max-height-input-output);
+    background-color: var(--color-surface-light);
+    transition: background-color 0.3s;
+    overflow-y: auto;
+}
+
+#txt-input {
+    resize: vertical;
+    min-height: var(--size-min-height-input-output);
+    height: var(--size-height-input-output-desktop); /* Desktop default height */
+    max-height: var(--size-max-height-input-output);
+    transition: background-color 0.3s;
+    overflow-y: auto;
+    font-family: monospace;
+}
+
+#output.executed {
+    background-color: var(--color-output-executed-bg);
+    transition: background-color 0.3s;
+}
+
+/* Input areas container */
+#input-container {
+    display: flex;
+    flex-direction: column;
+}
+
+#upper-half {
+    flex: 1;
+    min-height: var(--size-min-height-upper-half);
+}
+
+
+#d2d-input {
+    position: relative;
+    user-select: none;
+    margin-top: var(--space-xs);
+}
+
+#dot-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    margin-bottom: var(--space-md);
+    align-items: center;
+}
+
+.dot-row {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-md);
+}
+
+.dot {
+    width: var(--size-dot);
+    height: var(--size-dot);
+    border-radius: var(--radius-round);
+    border: 1px solid var(--color-border-light);
+    background-color: var(--color-surface-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+    color: var(--color-dot-text-muted); /* Original #aaa */
+    cursor: pointer;
+    position: relative;
+    transition: background-color 0.1s;
+    flex-shrink: 0;
+}
+
+.dot.numeric {
+    background-color: var(--color-dot-numeric-bg);
+    color: var(--color-dot-numeric-text);
+    font-size: 16px;
+}
+
+.dot.word-dot {
+    background-color: var(--color-dot-word-bg);
+    color: var(--color-dot-word-text);
+    font-size: 12px;
+    overflow: hidden;
+    text-align: center;
+    line-height: 1.2;
+}
+
+.dot.detected {
+    background-color: var(--color-dot-detected-bg);
+    border-color: var(--color-dot-numeric-text); /* Original #ef4444 */
+}
+
+#special-row {
+    display: flex;
+    justify-content: center;
+    gap: var(--space-md);
+    margin-top: var(--space-md);
+}
+
+.special-button {
+    width: var(--size-special-button-width);
+    height: var(--size-special-button-height);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--color-border-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    background-color: var(--color-special-button-bg);
+    flex-shrink: 0;
+    transition: transform 0.1s, background-color 0.1s;
+}
+
+.special-button.delete {
+    background-color: var(--color-special-button-delete-space-bg);
+}
+
+.special-button.space {
+    background-color: var(--color-special-button-delete-space-bg);
+}
+
+.special-button.long-pressed {
+    background-color: var(--color-special-button-long-pressed-bg);
+    transform: scale(0.95);
+}
+
+.special-button.combined-pressed {
+    background-color: var(--color-special-button-combined-pressed-bg);
+    transform: scale(0.95);
+}
+
+#special-row .dot.numeric {
+     flex-shrink: 0;
+     /* Note: original CSS had no specific styles for numeric dots within special-row,
+              so it inherits the general .dot.numeric style */
+}
+
+#line-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* Execute Button Style */
+#execute-button {
+    display: block;
+    width: var(--size-execute-button-width);
+    padding: var(--space-md);
+    margin: var(--space-md) auto;  /* 中央寄せ */
+    background-color: var(--color-execute-button-bg);
+    color: white; /* Original was white, keep as literal or define --color-white */
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#execute-button:hover {
+    background-color: var(--color-execute-button-hover-bg);
+}
+
+#execute-button:active {
+    background-color: var(--color-execute-button-active-bg);
+}
+
+/* Debug Panel Styles */
+#debug-panel {
+    margin-top: var(--space-lg);
+    padding: var(--space-md);
+    background-color: var(--color-debug-panel-bg);
+    border: 1px solid var(--color-debug-panel-border);
+    border-radius: var(--radius-md);
+}
+
+.control-container {
+    display: flex;
+    align-items: center;
+    margin: var(--space-sm) 0;
+}
+
+.control-container label {
+    min-width: var(--size-min-width-control-label);
+}
+
+.control-container input[type="range"] {
+    flex-grow: 1;
+    margin: 0 var(--space-md);
+}
+
+.value-display {
+    min-width: var(--size-min-width-value-display);
+    text-align: right;
+}
+
+.debug-output {
+    margin-top: var(--space-md);
+    padding: var(--space-md);
+    background-color: var(--color-debug-output-bg);
+    border-radius: var(--radius-sm);
+    max-height: var(--size-max-height-debug-output);
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 12px;
+}
+
+.recognition-feedback {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background-color: rgba(255, 255, 255, 0.9); /* Original rgba */
+    border-radius: var(--radius-round);
+    width: var(--size-feedback-circle);
+    height: var(--size-feedback-circle);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: var(--size-feedback-text);
+    font-weight: bold;
+    color: var(--color-dot-word-text); /* Original #3b82f6 */
+    animation: fadeOut 0.8s ease-out forwards;
+    pointer-events: none;
+}
+
+@keyframes fadeOut {
+    0% {
+        opacity: 1;
+    }
+    70% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+    }
+}
+
+/* Responsive layout */
+@media (max-width: 768px) {
+
+    #mobile-container {
+        display: flex;
+        flex-direction: column;
+        /* Assuming 80px header/footer space, adjust if needed */
+        height: calc(100vh - 80px);
+    }
+
+    #upper-half {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .input-section,
+    .output-section {
+        flex: 1;
+        transition: transform 0.3s ease;
+        width: 100%;
+    }
+
+    #output,
+    #txt-input {
+        /* Adjusted height for mobile */
+        height: 200px; /* Keep 200px as it was in the original media query */
+        /* min-height: 6rem; was only on #txt-input in original mobile query */
+    }
+
+    #txt-input {
+         min-height: 6rem; /* Original mobile specific min-height */
+    }
+
+
+    .hide {
+        display: none;
+    }
+
+    #d2d-section {
+        height: 50vh;
+        min-height: var(--size-min-height-d2d-mobile); /* Use variable for 300px */
+        touch-action: auto; /* モバイルでのタッチ操作を有効化 */
+    }
+
+    #debug-panel {
+        display: none;
+    }
+
+    /* モバイル用にタッチ操作を確実に有効化 */
+    body,
+    #d2d-input,
+    .dot,
+    .special-button {
+        touch-action: auto;
+    }
+
+    /* モバイルでのタッチ操作時のハイライト無効化 */
+    * {
+        -webkit-tap-highlight-color: transparent;
+    }
+}
+
+@media (min-width: 769px) {
+    #mobile-container {
+        display: block;
+    }
+
+    .input-section,
+    .output-section {
+        display: block;
+    }
+
+    .hide {
+        display: block;
+    }
+
+    /* Restore desktop heights if they were overridden in mobile */
+    #output,
+    #txt-input {
+         height: var(--size-height-input-output-desktop);
+    }
+}
