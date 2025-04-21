@@ -1,5 +1,4 @@
-
-	:root {
+:root {
     /* カラーパレット (元のスタイルシートの色を定義) */
     --color-body-bg: #f0f0f0;
     --color-article-bg: #ffffff;
@@ -69,6 +68,7 @@ body {
     text-align: center;
     background-color: var(--color-body-bg);
     font-family: sans-serif;
+    touch-action: pan-x pan-y;
 }
 
 /* Main layout container */
@@ -156,6 +156,7 @@ section:last-child {
     position: relative;
     user-select: none;
     margin-top: var(--space-xs);
+    touch-action: none; /* モバイルでのスクロールを防止 */
 }
 
 #dot-grid {
@@ -188,6 +189,7 @@ section:last-child {
     position: relative;
     transition: background-color 0.1s;
     flex-shrink: 0;
+    touch-action: none; /* タッチ操作のスクロール防止 */
 }
 
 .dot.numeric {
@@ -231,6 +233,7 @@ section:last-child {
     background-color: var(--color-special-button-bg);
     flex-shrink: 0;
     transition: transform 0.1s, background-color 0.1s;
+    touch-action: none; /* タッチ操作のスクロール防止 */
 }
 
 .special-button.delete {
@@ -272,7 +275,7 @@ section:last-child {
     display: block;
     width: var(--size-execute-button-width);
     padding: var(--space-md);
-    margin: var(--space-md) auto;  /* 中央寄せ */
+    margin: var(--space-md) auto;  /* 中央寄せ */
     background-color: var(--color-execute-button-bg);
     color: white; /* Original was white, keep as literal or define --color-white */
     border: none;
@@ -370,6 +373,7 @@ section:last-child {
         flex-direction: column;
         /* Assuming 80px header/footer space, adjust if needed */
         height: calc(100vh - 80px);
+        touch-action: none; /* モバイルでのスクロールを防止 */
     }
 
     #upper-half {
@@ -404,20 +408,27 @@ section:last-child {
 
     #d2d-section {
         height: 50vh;
-        min-height: var(--size-min-height-d2d-mobile); /* Use variable for 300px */
-        touch-action: auto; /* モバイルでのタッチ操作を有効化 */
+        min-height: 300px;
+        touch-action: none; /* モバイルでのスクロールを防止 */
     }
 
     #debug-panel {
         display: none;
     }
 
-    /* モバイル用にタッチ操作を確実に有効化 */
-    body,
-    #d2d-input,
-    .dot,
+    /* モバイル用にタッチ操作を調整 */
+    body {
+        touch-action: pan-x pan-y; /* 基本的なスクロールは許可 */
+        overflow-x: hidden; /* 横スクロール防止 */
+    }
+    
+    #d2d-input {
+        touch-action: none; /* d2d-input内でのスクロールを防止 */
+    }
+    
+    .dot, 
     .special-button {
-        touch-action: auto;
+        touch-action: none; /* 要素内でのスクロールを防止 */
     }
 
     /* モバイルでのタッチ操作時のハイライト無効化 */
