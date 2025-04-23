@@ -409,7 +409,6 @@ section:last-child {
     #d2d-section {
         height: 50vh;
         min-height: 300px;
-        touch-action: none; /* モバイルでのスクロールを防止 */
     }
 
     #debug-panel {
@@ -422,19 +421,14 @@ section:last-child {
         overflow-x: hidden; /* 横スクロール防止 */
     }
     
-    #d2d-input {
-        touch-action: none; /* d2d-input内でのスクロールを防止 */
-    }
+    
     
     .dot, 
     .special-button {
         touch-action: none; /* 要素内でのスクロールを防止 */
     }
 
-    /* モバイルでのタッチ操作時のハイライト無効化 */
-    * {
-        -webkit-tap-highlight-color: transparent;
-    }
+    
 }
 
 @media (min-width: 769px) {

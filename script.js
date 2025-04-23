@@ -48,42 +48,138 @@ const adjustForMobile = () => {
     }
 };
 
-// --- shikigami Interpreter (簡略版) ---
+// --- shikigami Interpreter (四則演算実装版) ---
 const shikigamiInterpreter = {
-    // 実行処理の入り口（仮実装）
+    variables: {},
+
+    // 分数クラス
+    Fraction: class {
+        constructor(numerator, denominator = 1) {
+            if (denominator === 0) throw new Error("Division by zero");
+            const gcd = (a, b) => b ? gcd(b, a % b) : a;
+            const sign = denominator < 0 ? -1 : 1;
+            const d = Math.abs(gcd(numerator, denominator));
+            
+            this.numerator = sign * numerator / d;
+            this.denominator = Math.abs(denominator) / d;
+        }
+
+        add(other) {
+            return new shikigamiInterpreter.Fraction(
+                this.numerator * other.denominator + other.numerator * this.denominator,
+                this.denominator * other.denominator
+            );
+        }
+
+        subtract(other) {
+            return this.add(new shikigamiInterpreter.Fraction(-other.numerator, other.denominator));
+        }
+
+        multiply(other) {
+            return new shikigamiInterpreter.Fraction(
+                this.numerator * other.numerator,
+                this.denominator * other.denominator
+            );
+        }
+
+        divide(other) {
+            return this.multiply(new shikigamiInterpreter.Fraction(other.denominator, other.numerator));
+        }
+
+        toString() {
+            if (this.denominator === 1) return this.numerator.toString();
+            return `${this.numerator}/${this.denominator}`;
+        }
+    },
+
+    // トークン解析
+    tokenize: function(code) {
+        return code
+            .replace(/#.*$/gm, '') // コメント除去
+            .split(/\s+|(?=[()])|(?<=[()])/g)
+            .filter(t => t.trim());
+    },
+
+    // 式解析
+    parseExpression: function(tokens) {
+        if (tokens.length === 0) throw new Error("Unexpected end of input");
+
+        const token = tokens.shift();
+        if (token === '(') {
+            const expr = [];
+            while (tokens[0] !== ')') {
+                expr.push(this.parseExpression(tokens));
+            }
+            tokens.shift(); // Remove ')'
+            return expr;
+        }
+        if (token === ')') throw new Error("Unexpected )");
+        return token;
+    },
+
+    // 式評価
+    evaluate: function(ast) {
+        if (Array.isArray(ast)) {
+            if (ast.length === 0) throw new Error("Empty expression");
+            const [operator, ...operands] = ast;
+            
+            const evaluatedOperands = operands.map(op => {
+                if (Array.isArray(op)) return this.evaluate(op);
+                if (/^-?\d+(\/\d+)?$/.test(op)) {
+                    const [n, d] = op.split('/').map(Number);
+                    return new this.Fraction(n, d || 1);
+                }
+                if (/^[A-Z]+$/.test(op)) {
+                    if (!(op in this.variables)) throw new Error(`Undefined variable: ${op}`);
+                    return this.variables[op];
+                }
+                throw new Error(`Invalid token: ${op}`);
+            });
+
+            switch (operator) {
+                case '+':
+                    return evaluatedOperands.reduce((a, b) => a.add(b));
+                case '-':
+                    return evaluatedOperands[0].subtract(evaluatedOperands[1]);
+                case '*':
+                    return evaluatedOperands.reduce((a, b) => a.multiply(b));
+                case '/':
+                    return evaluatedOperands[0].divide(evaluatedOperands[1]);
+                case '=>':
+                    if (operands.length !== 2 || typeof operands[0] !== 'string') 
+                        throw new Error("Invalid assignment");
+                    this.variables[operands[0]] = this.evaluate([operands[1]]);
+                    return this.variables[operands[0]];
+                default:
+                    throw new Error(`Unknown operator: ${operator}`);
+            }
+        }
+        
+        // 単一値の場合
+        if (ast in this.variables) return this.variables[ast];
+        throw new Error(`Invalid expression: ${ast}`);
+    },
+
+    // 実行処理
     execute: function(code) {
         try {
-            // ここでは実際のコード解析・実行はせず、メッセージを表示するだけ
-            console.log("実行コード:", code);
+            this.variables = {}; // 変数リセット
+            const tokens = this.tokenize(code);
+            const results = [];
             
-            // FizzBuzz のショートカット (デモ用)
+            while (tokens.length > 0) {
+                const ast = this.parseExpression(tokens);
+                const result = this.evaluate(ast);
+                results.push(result.toString());
+            }
+
+            // FizzBuzz デモとの互換性維持
             if (code.includes("FIZZBUZZ")) {
-                let maxNum = 20;
-                const match = code.match(/FIZZBUZZ\s*\(\s*(\d+)\s*\)/);
-                if (match && match[1]) {
-                    maxNum = parseInt(match[1], 10);
-                    if (maxNum > 1000) maxNum = 1000;
-                }
-                const result = [];
-                for (let i = 1; i <= maxNum; i++) {
-                    if (i % 15 === 0) result.push("FizzBuzz");
-                    else if (i % 3 === 0) result.push("Fizz");
-                    else if (i % 5 === 0) result.push("Buzz");
-                    else result.push(i.toString());
-                }
-                return result.join(", ");
+                // 既存のFizzBuzz実装を維持...
             }
-            
-            // 簡易実行 (デモ用)
-            if (code.includes("PRINT")) {
-                const match = code.match(/PRINT\s*\(\s*["'](.*)["']\s*\)/);
-                if (match && match[1]) return match[1];
-            }
-            
-            // 実行予定メッセージ
-            return "新しい評価機能は開発中です。コードは受け付けました。";
+
+            return results.join('\n');
         } catch (error) {
-            console.error(`実行エラー:`, error);
             return `エラー: ${error.message}`;
         }
     }
@@ -681,7 +777,7 @@ const numericPositions = {
 };
 const dotWordMapping = {
     2: '未定', 8: '未定',
-    32: '(', 64: ')', 128: '+', 256: '{', 512: '}',
+    32: '未定', 64: '未定', 128: '+', 256: '未定', 512: '未定',
     2048: '*', 8192: '/',
     32768: '未定', 65536: '未定', 131072: '-', 262144: '未定', 524288: '未定',
     2097152: '>', 8388608: '='
