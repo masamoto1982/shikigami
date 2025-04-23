@@ -24,30 +24,6 @@ const CONFIG = {
     }
 };
 
-// --- デバイス検出と調整 ---
-const isMobileDevice = () => {
-    return (
-        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-        (window.innerWidth <= 768)
-    );
-};
-
-const adjustForMobile = () => {
-    if (isMobileDevice()) {
-        // モバイル用の設定調整
-        CONFIG.sensitivity.hitRadius = Math.max(CONFIG.sensitivity.hitRadius, 28); // より大きなヒット範囲
-        CONFIG.sensitivity.minSwipeDistance = Math.max(CONFIG.sensitivity.minSwipeDistance, 8); // より大きなスワイプ距離
-        CONFIG.timing.longPressDuration = Math.min(CONFIG.timing.longPressDuration, 400); // より短い長押し時間
-        
-        // モバイル用のスクロール防止
-        document.body.addEventListener('touchmove', e => {
-            if (e.target.closest('#d2d-input')) {
-                e.preventDefault();
-            }
-        }, { passive: false });
-    }
-};
-
 // --- shikigami Interpreter (四則演算実装版) ---
 const shikigamiInterpreter = {
     variables: {},
