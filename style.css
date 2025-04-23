@@ -373,7 +373,6 @@ section:last-child {
         flex-direction: column;
         /* Assuming 80px header/footer space, adjust if needed */
         height: calc(100vh - 80px);
-        touch-action: none; /* モバイルでのスクロールを防止 */
     }
 
     #upper-half {
@@ -414,20 +413,6 @@ section:last-child {
     #debug-panel {
         display: none;
     }
-
-    /* モバイル用にタッチ操作を調整 */
-    body {
-        touch-action: pan-x pan-y; /* 基本的なスクロールは許可 */
-        overflow-x: hidden; /* 横スクロール防止 */
-    }
-    
-    
-    
-    .dot, 
-    .special-button {
-        touch-action: none; /* 要素内でのスクロールを防止 */
-    }
-
     
 }
 
