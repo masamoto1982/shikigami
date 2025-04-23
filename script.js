@@ -779,9 +779,6 @@ window.onload = () => {
     setupExecuteButtonListener();
     setupKeyboardHandlers();
     
-    // 自動フォーマット機能の初期化
-    codeFormatter.setupAutoFormat(elements.input);
-    
     // タッチ操作の最適化
     if (isMobileDevice()) {
         document.addEventListener('touchstart', e => {
