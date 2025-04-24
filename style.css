@@ -269,6 +269,14 @@ section:last-child {
     font-size: 12px;
 }
 
+/* ダブルタップのビジュアルフィードバック */
+.dot.double-tapped {
+    background-color: #fde68a;
+    transform: scale(0.95);
+    transition: background-color 0.2s, transform 0.2s;
+}
+
+/* 認識フィードバックのスタイル */
 .recognition-feedback {
     position: absolute;
     top: 50%;
@@ -276,18 +284,20 @@ section:last-child {
     transform: translate(-50%, -50%);
     background-color: rgba(255, 255, 255, 0.9);
     border-radius: 50%;
-    width: 80px;
-    height: 80px;
+    width: 120px; 
+    height: 120px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 32px;
+    font-size: 60px;
     font-weight: bold;
     color: #3b82f6;
     animation: fadeOut 0.8s ease-out forwards;
     pointer-events: none;
+    z-index: 100; /* 確実に前面に表示 */
 }
 
+/* フェードアウトアニメーション */
 @keyframes fadeOut {
     0% {
         opacity: 1;

@@ -8,7 +8,7 @@ const CONFIG = {
     },
     timing: {
         multiStrokeTimeout: 700,
-        longPressDuration: 500,
+        doubleTapDelay: 300,
         strokeCooldown: 100,
     },
     layout: {
@@ -21,619 +21,16 @@ const CONFIG = {
         lineWidth: 3,
         lineColor: '#ef4444',
         detectedColor: '#fca5a5',
+        // 認識フィードバックのサイズ
+        feedbackSize: 120,
+        feedbackTextSize: 60
     }
 };
 
-// --- デバイス検出と調整 ---
-const isMobileDevice = () => {
-    return (
-        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-        (window.innerWidth <= 768) ||
-        ('ontouchstart' in window) ||
-        (navigator.maxTouchPoints > 0)
-    );
-};
-
-const adjustForMobile = () => {
-    if (isMobileDevice()) {
-        // モバイル用の設定調整
-        CONFIG.sensitivity.hitRadius = Math.max(CONFIG.sensitivity.hitRadius, 28); // より大きなヒット範囲
-        CONFIG.sensitivity.minSwipeDistance = Math.max(CONFIG.sensitivity.minSwipeDistance, 8); // より大きなスワイプ距離
-        CONFIG.timing.longPressDuration = Math.min(CONFIG.timing.longPressDuration, 400); // より短い長押し時間
-        
-        // モバイル用のスクロール防止 - 統一されたアプローチ
-        const preventDefaultForD2D = (e) => {
-            if (e.target.closest('#d2d-input, #d2d-section, .dot, .special-button')) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-        };
-        
-        document.addEventListener('touchstart', preventDefaultForD2D, { passive: false });
-        document.addEventListener('touchmove', preventDefaultForD2D, { passive: false });
-    }
-};
-
-// --- Fraction Class Definition ---
-class Fraction {
-    constructor(numerator, denominator = 1) {
-        if (typeof numerator !== 'number' || typeof denominator !== 'number') {
-            throw new Error("Numerator and denominator must be numbers.");
-        }
-        if (denominator === 0) {
-            throw new Error("Division by zero: Denominator cannot be zero.");
-        }
-        if (!Number.isInteger(numerator) || !Number.isInteger(denominator)) {
-            console.warn("Fraction created with non-integer values. Consider using integers for precision.");
-        }
-        const commonDivisor = this.gcd(Math.abs(numerator), Math.abs(denominator));
-        const sign = (denominator < 0) ? -1 : 1;
-        this.numerator = sign * (numerator / commonDivisor);
-        this.denominator = Math.abs(denominator / commonDivisor);
-    }
-
-    gcd(a, b) {
-        a = Math.abs(Math.round(a));
-        b = Math.abs(Math.round(b));
-        while (b !== 0) { [a, b] = [b, a % b]; }
-        return a;
-    }
-    add(other) {
-        if (!(other instanceof Fraction)) throw new Error("Can only add Fraction objects.");
-        const newNumerator = this.numerator * other.denominator + other.numerator * this.denominator;
-        const newDenominator = this.denominator * other.denominator;
-        return new Fraction(newNumerator, newDenominator);
-    }
-    subtract(other) {
-        if (!(other instanceof Fraction)) throw new Error("Can only subtract Fraction objects.");
-        const newNumerator = this.numerator * other.denominator - other.numerator * this.denominator;
-        const newDenominator = this.denominator * other.denominator;
-        return new Fraction(newNumerator, newDenominator);
-    }
-    multiply(other) {
-        if (!(other instanceof Fraction)) throw new Error("Can only multiply Fraction objects.");
-        const newNumerator = this.numerator * other.numerator;
-        const newDenominator = this.denominator * other.denominator;
-        return new Fraction(newNumerator, newDenominator);
-    }
-    divide(other) {
-        if (!(other instanceof Fraction)) throw new Error("Can only divide Fraction objects.");
-        if (other.numerator === 0) throw new Error("Division by zero: Cannot divide by a zero fraction.");
-        const newNumerator = this.numerator * other.denominator;
-        const newDenominator = this.denominator * other.numerator;
-        return new Fraction(newNumerator, newDenominator);
-    }
-    equals(other) {
-        if (!(other instanceof Fraction)) return false;
-        return this.numerator === other.numerator && this.denominator === other.denominator;
-    }
-    lessThan(other) {
-        if (!(other instanceof Fraction)) throw new Error("Can only compare Fraction objects.");
-        return this.numerator * other.denominator < other.numerator * this.denominator;
-    }
-    greaterThan(other) {
-        if (!(other instanceof Fraction)) throw new Error("Can only compare Fraction objects.");
-        return this.numerator * other.denominator > other.numerator * this.denominator;
-    }
-    toString() {
-        return this.denominator === 1 ? `${this.numerator}` : `${this.numerator}/${this.denominator}`;
-    }
-    toNumber() {
-        return this.numerator / this.denominator;
-    }
-}
-
-// --- 自動フォーマット機能 ---
-const codeFormatter = {
-    indentSize: 4,
-    
-    format: function(code) {
-        if (!code || typeof code !== 'string') return code;
-        
-        const lines = code.split('\n');
-        const formattedLines = [];
-        let indentLevel = 0;
-        
-        for (let i = 0; i < lines.length; i++) {
-            let line = lines[i].trim();
-            
-            // コメント行はトリムのみ
-            if (line.startsWith('#')) {
-                formattedLines.push(' '.repeat(indentLevel * this.indentSize) + line);
-                continue;
-            }
-            
-            // 閉じ括弧があれば、先にインデントを減らす
-            if (line.includes('}')) {
-                const closingBraceIndex = line.indexOf('}');
-                if (closingBraceIndex === 0) {
-                    indentLevel = Math.max(0, indentLevel - 1);
-                }
-            }
-            
-            // 現在のインデントレベルに合わせてスペースを追加
-            formattedLines.push(' '.repeat(indentLevel * this.indentSize) + line);
-            
-            // 開き括弧があれば、次の行からインデントを増やす
-            if (line.includes('{')) {
-                indentLevel++;
-            }
-        }
-        
-        return formattedLines.join('\n');
-    },
-    
-    setupAutoFormat: function(inputElement) {
-        if (!inputElement) return;
-        
-        let timeout = null;
-        const delay = 500; // フォーマット実行の遅延（ms）
-        
-        inputElement.addEventListener('input', () => {
-            clearTimeout(timeout);
-            
-            // 入力後、一定時間経過後にフォーマット実行
-            timeout = setTimeout(() => {
-                const cursorPos = inputElement.selectionStart;
-                const textBeforeCursor = inputElement.value.substring(0, cursorPos);
-                const textAfterCursor = inputElement.value.substring(cursorPos);
-                
-                // フォーマット適用
-                const formattedText = this.format(inputElement.value);
-                inputElement.value = formattedText;
-                
-                // カーソル位置の再調整（簡易版）
-                try {
-                    const newCursorPos = Math.min(
-                        cursorPos + (formattedText.length - (textBeforeCursor.length + textAfterCursor.length)), 
-                        formattedText.length
-                    );
-                    inputElement.setSelectionRange(newCursorPos, newCursorPos);
-                } catch (e) {
-                    console.error('カーソル位置調整エラー:', e);
-                }
-            }, delay);
-        });
-        
-        // フォーカスを得たときにもフォーマットを適用
-        inputElement.addEventListener('focus', () => {
-            inputElement.value = this.format(inputElement.value);
-        });
-    }
-};
-
-// --- shikigami Interpreter ---
+// --- 簡略化されたインタープリター ---
 const shikigamiInterpreter = {
-    // 変数とその値を保持する環境
-    environment: {
-        global: {},
-        current: null
-    },
-    
-    // 標準関数の定義
-    standardFunctions: {
-        PRINT: (value) => {
-            console.log(value);
-            return value;
-        },
-        RANGE: (start, end) => {
-            const result = [];
-            let i = start instanceof Fraction ? start.toNumber() : start;
-            let e = end instanceof Fraction ? end.toNumber() : end;
-            for (let j = i; j <= e; j++) {
-                result.push(new Fraction(j));
-            }
-            return result;
-        },
-        MAP: (array, fn) => {
-            return array.map(fn);
-        },
-        FILTER: (array, fn) => {
-            return array.filter(fn);
-        },
-        REDUCE: (array, fn, initial) => {
-            return array.reduce(fn, initial);
-        },
-        ABS: (x) => {
-            if (x instanceof Fraction) {
-                return new Fraction(Math.abs(x.numerator), x.denominator);
-            }
-            return Math.abs(x);
-        },
-        TO_STRING: (value) => {
-            return String(value);
-        }
-    },
-    
-    // 環境の初期化
-    initEnvironment: function() {
-        this.environment.global = {...this.standardFunctions};
-        this.environment.current = this.environment.global;
-    },
-    
-    // パイプライン演算子の処理
-    processPipeline: function(left, right, env) {
-        const leftValue = this.evaluateExpression(left, env);
-        // rightは関数である必要がある
-        if (typeof right === 'function') {
-            return right(leftValue);
-        } else if (Array.isArray(right) && right.length >= 3 && right[1] === '(') {
-            // 関数呼び出し形式
-            const fnName = right[0];
-            const args = this.parseArguments(right.slice(2, -1));
-            
-            if (fnName in env) {
-                const fn = env[fnName];
-                if (typeof fn === 'function') {
-                    // 第一引数として左辺の値を渡す
-                    const evaluatedArgs = args.map(arg => this.evaluateExpression(arg, env));
-                    return fn(leftValue, ...evaluatedArgs);
-                }
-            }
-        }
-        throw new Error(`パイプライン右辺が関数ではありません: ${JSON.stringify(right)}`);
-    },
-    
-    // トークン化処理
-    tokenize: function(code) {
-        // # から始まるコメント行を処理
-        code = code.replace(/#.*$/gm, '');
-        
-        // 正規表現を使って、コードを適切なトークンに分割
-        const tokenRegex = /=>|\|>|>=|==|[A-Z][A-Z0-9_]*|[a-z][a-z0-9_]*|\d+\/\d+|\d+\.\d+|\d+|"[^"]*"|'[^']*'|\(|\)|\{|\}|\[|\]|,|;|\.|\+|\-|\*|\/|%|\?|:|>|=/g;
-        const tokens = [];
-        const lines = code.split('\n');
-        
-        for (const line of lines) {
-            let match;
-            const lineTokens = [];
-            const lineRegex = new RegExp(tokenRegex);
-            
-            while ((match = lineRegex.exec(line)) !== null) {
-                const token = match[0];
-                lineTokens.push(token);
-            }
-            
-            if (lineTokens.length > 0) {
-                tokens.push(lineTokens);
-            }
-        }
-        
-        return tokens;
-    },
-    
-    // 式の評価
-    evaluateExpression: function(expr, env) {
-        if (typeof expr === 'number') {
-            return new Fraction(expr);
-        }
-        
-        if (typeof expr === 'string') {
-            // 変数参照
-            if (/^[A-Z][A-Z0-9_]*$/.test(expr)) {
-                if (expr in env) {
-                    return env[expr];
-                }
-                throw new Error(`変数 '${expr}' は定義されていません`);
-            }
-            
-            // 文字列リテラル
-            if (expr.startsWith('"') && expr.endsWith('"')) {
-                return expr.slice(1, -1);
-            }
-            
-            // 分数リテラル
-            if (/^\d+\/\d+$/.test(expr)) {
-                const [numerator, denominator] = expr.split('/').map(Number);
-                return new Fraction(numerator, denominator);
-            }
-            
-            // 整数リテラル
-            if (/^\d+$/.test(expr)) {
-                return new Fraction(Number(expr));
-            }
-        }
-        
-        if (Array.isArray(expr)) {
-            // パイプライン演算子
-            const pipeIndex = expr.indexOf('|>');
-            if (pipeIndex !== -1) {
-                const left = expr.slice(0, pipeIndex);
-                const right = expr.slice(pipeIndex + 1);
-                return this.processPipeline(left, right, env);
-            }
-            
-            // 関数呼び出し
-            if (expr.length >= 3 && expr[1] === '(') {
-                const fnName = expr[0];
-                const args = this.parseArguments(expr.slice(2, -1));
-                
-                if (fnName in env) {
-                    const fn = env[fnName];
-                    if (typeof fn === 'function') {
-                        const evaluatedArgs = args.map(arg => this.evaluateExpression(arg, env));
-                        return fn(...evaluatedArgs);
-                    }
-                }
-                throw new Error(`関数 '${fnName}' は定義されていないか、呼び出し可能ではありません`);
-            }
-            
-            // 代入
-            if (expr.length >= 3 && expr[1] === '=>') {
-                const varName = expr[0];
-                // Types as Commentsの型情報をスキップ
-                let typeInfo = null;
-                let valueExpr;
-                
-                if (varName.includes(':')) {
-                    const parts = varName.split(':');
-                    // 最初の部分が変数名、2番目以降が型情報
-                    varName = parts[0].trim();
-                    typeInfo = parts.slice(1).join(':').trim();
-                }
-                
-                valueExpr = expr.slice(2);
-                const value = this.evaluateExpression(valueExpr, env);
-                
-                // 変数名は大文字のみ許可
-                if (!/^[A-Z][A-Z0-9_]*$/.test(varName)) {
-                    throw new Error(`変数名は大文字で始まる必要があります: ${varName}`);
-                }
-                
-                env[varName] = value;
-                return value;
-            }
-            
-            // 二項演算
-            if (expr.length === 3) {
-                const left = this.evaluateExpression(expr[0], env);
-                const operator = expr[1];
-                const right = this.evaluateExpression(expr[2], env);
-                
-                return this.applyOperator(left, operator, right);
-            }
-            
-            // 条件式 (三項演算子)
-            if (expr.length === 5 && expr[3] === '?') {
-                const condition = this.evaluateExpression(expr.slice(0, 3), env);
-                return condition ? this.evaluateExpression(expr[4], env) : this.evaluateExpression(expr[6], env);
-            }
-        }
-        
-        throw new Error(`無効な式です: ${JSON.stringify(expr)}`);
-    },
-    
-    // 演算子の適用
-    applyOperator: function(left, operator, right) {
-        switch (operator) {
-            case '+':
-                if (typeof left === 'string' || typeof right === 'string') {
-                    return String(left) + String(right);
-                }
-                if (left instanceof Fraction && right instanceof Fraction) {
-                    return left.add(right);
-                }
-                return left + right;
-            
-            case '-':
-                if (left instanceof Fraction && right instanceof Fraction) {
-                    return left.subtract(right);
-                }
-                return left - right;
-            
-            case '*':
-                if (left instanceof Fraction && right instanceof Fraction) {
-                    return left.multiply(right);
-                }
-                return left * right;
-            
-            case '/':
-                if (right === 0 || (right instanceof Fraction && right.numerator === 0)) {
-                    throw new Error("ゼロによる除算はできません");
-                }
-                if (typeof left === 'number' && typeof right === 'number') {
-                    return new Fraction(left, right);
-                }
-                if (left instanceof Fraction && right instanceof Fraction) {
-                    return left.divide(right);
-                }
-                return left / right;
-            
-            case '%':
-                if (right === 0 || (right instanceof Fraction && right.numerator === 0)) {
-                    throw new Error("ゼロによる剰余演算はできません");
-                }
-                if (left instanceof Fraction && right instanceof Fraction) {
-                    // 分数の剰余演算は複雑なので、数値に変換して計算
-                    return new Fraction(left.toNumber() % right.toNumber());
-                }
-                return left % right;
-            
-            case '>':
-                if (left instanceof Fraction && right instanceof Fraction) {
-                    return left.greaterThan(right);
-                }
-                return left > right;
-            
-            case '>=':
-                if (left instanceof Fraction && right instanceof Fraction) {
-                    return left.greaterThan(right) || left.equals(right);
-                }
-                return left >= right;
-            
-            case '==':
-                if (left instanceof Fraction && right instanceof Fraction) {
-                    return left.equals(right);
-                }
-                return left === right;
-            
-            default:
-                throw new Error(`サポートされていない演算子です: ${operator}`);
-        }
-    },
-    
-    // 引数のパース
-    parseArguments: function(tokens) {
-        const args = [];
-        let currentArg = [];
-        let level = 0;
-        
-        for (const token of tokens) {
-            if (token === ',' && level === 0) {
-                if (currentArg.length > 0) {
-                    args.push(currentArg.length === 1 ? currentArg[0] : currentArg);
-                    currentArg = [];
-                }
-            } else {
-                if (token === '(' || token === '[' || token === '{') {
-                    level++;
-                } else if (token === ')' || token === ']' || token === '}') {
-                    level--;
-                }
-                currentArg.push(token);
-            }
-        }
-        
-        if (currentArg.length > 0) {
-            args.push(currentArg.length === 1 ? currentArg[0] : currentArg);
-        }
-        
-        return args;
-    },
-    
-    // 関数定義の処理
-    parseFunctionDefinition: function(tokens, env) {
-        // 形式: FUNCNAME: (type) => type => (arg) => expr
-        const funcName = tokens[0].split(':')[0]; // 型情報があれば分離
-        const argsStart = tokens.indexOf('(');
-        const argsEnd = this.findMatchingBracket(tokens, argsStart, '(', ')');
-        const arrowIndex = tokens.indexOf('=>', argsEnd + 1);
-        const bodyStart = tokens.indexOf('{', arrowIndex + 1);
-        
-        let bodyEnd;
-        if (bodyStart !== -1) {
-            bodyEnd = this.findMatchingBracket(tokens, bodyStart, '{', '}');
-        } else {
-            // 単一式の関数の場合は括弧がない
-            bodyEnd = tokens.length - 1;
-        }
-        
-        if (argsStart === -1 || argsEnd === -1 || arrowIndex === -1) {
-            throw new Error(`関数定義の構文が無効です: ${tokens.join(' ')}`);
-        }
-        
-        const argTokens = tokens.slice(argsStart + 1, argsEnd);
-        const argNames = this.parseArguments(argTokens).map(arg => {
-            if (typeof arg === 'string' && /^[A-Z][A-Z0-9_]*$/.test(arg)) {
-                return arg;
-            }
-            throw new Error(`関数引数名が無効です: ${arg}`);
-        });
-        
-        const bodyTokens = bodyStart !== -1 
-            ? tokens.slice(bodyStart + 1, bodyEnd)
-            : tokens.slice(arrowIndex + 1);
-        
-        // 関数を定義
-        env[funcName] = (...args) => {
-            const localEnv = Object.create(env);
-            for (let i = 0; i < argNames.length; i++) {
-                localEnv[argNames[i]] = args[i];
-            }
-            
-            return this.evaluateStatements(bodyTokens, localEnv);
-        };
-        
-        return env[funcName];
-    },
-    
-    // 対応する括弧を見つける
-    findMatchingBracket: function(tokens, start, open, close) {
-        let level = 1;
-        for (let i = start + 1; i < tokens.length; i++) {
-            if (tokens[i] === open) level++;
-            else if (tokens[i] === close) {
-                level--;
-                if (level === 0) return i;
-            }
-        }
-        return -1;
-    },
-    
-    // 文の評価
-    evaluateStatements: function(tokens, env) {
-        let result;
-        let index = 0;
-        
-        while (index < tokens.length) {
-            const statementEnd = this.findStatementEnd(tokens, index);
-            if (statementEnd === -1) break;
-            
-            const statement = tokens.slice(index, statementEnd + 1);
-            result = this.evaluateStatement(statement, env);
-            
-            index = statementEnd + 1;
-        }
-        
-        return result;
-    },
-    
-    // 文の終わりを見つける
-    findStatementEnd: function(tokens, start) {
-        let level = 0;
-        for (let i = start; i < tokens.length; i++) {
-            const token = tokens[i];
-            if (token === '(' || token === '[' || token === '{') {
-                level++;
-            } else if (token === ')' || token === ']' || token === '}') {
-                level--;
-            } else if (token === ';' && level === 0) {
-                return i;
-            }
-        }
-        return tokens.length - 1;
-    },
-    
-    // 単一の文を評価
-    evaluateStatement: function(tokens, env) {
-        if (tokens.length === 0) return undefined;
-        
-        // return 文
-        if (tokens[0] === 'return') {
-            return this.evaluateExpression(tokens.slice(1), env);
-        }
-        
-        // 関数定義
-        if (tokens.length >= 5 && /^[A-Z][A-Z0-9_]*$/.test(tokens[0]) && tokens[1] === '=>') {
-            return this.parseFunctionDefinition(tokens, env);
-        }
-        
-        // 変数代入
-        if (tokens.length >= 3 && /^[A-Z][A-Z0-9_]*$/.test(tokens[0].split(':')[0]) && tokens[1] === '=>') {
-            const varName = tokens[0].split(':')[0]; // 型情報があれば分離
-            const value = this.evaluateExpression(tokens.slice(2), env);
-            env[varName] = value;
-            return value;
-        }
-        
-        // 式の評価
-        return this.evaluateExpression(tokens, env);
-    },
-    
-    // パース処理の入り口
-    parse: function(code) {
-        try {
-            const tokens = this.tokenize(code);
-            return tokens;
-        } catch (error) {
-            throw new Error(`パースエラー: ${error.message}`);
-        }
-    },
-    
-    // 実行処理の入り口
     execute: function(code) {
         try {
-            this.initEnvironment();
             console.log("実行コード:", code);
             
             // FizzBuzz のショートカット (デモ用)
@@ -660,14 +57,7 @@ const shikigamiInterpreter = {
                 if (match && match[1]) return match[1];
             }
             
-            // 本格的なパースと実行
-            const tokens = this.parse(code);
-            if (tokens.length > 0) {
-                const result = this.evaluateStatements(tokens.flat(), this.environment.current);
-                return result !== undefined ? String(result) : "実行完了";
-            }
-            
-            return "実行完了";
+            return "実行完了 (実際の言語処理は実装中)";
         } catch (error) {
             return `エラー: ${error.message}`;
         }
@@ -686,7 +76,7 @@ const elements = {
     outputSection: document.getElementById('output-section'),
     textSection: document.getElementById('text-section')
 };
-const lineCtx = elements.lineCanvas.getContext('2d');
+const lineCtx = elements.lineCanvas ? elements.lineCanvas.getContext('2d') : null;
 
 // --- Gesture State (Mutable) ---
 const drawState = {
@@ -699,12 +89,17 @@ const drawState = {
     lastDetectionTime: 0,
     currentStrokeDetected: false,
     strokeTimer: null,
-    longPressTimer: null,
-    isLongPress: false,
     currentTouchId: null,
     pointerStartTime: 0,
     pointerStartX: 0,
     pointerStartY: 0
+};
+
+// ダブルタップ検出のための状態管理
+const tapState = {
+    lastTapTime: 0,
+    lastTapElement: null,
+    doubleTapDelay: CONFIG.timing.doubleTapDelay
 };
 
 const specialButtonState = {
@@ -725,6 +120,8 @@ const keyState = {
 // --- Utility Functions ---
 const insertAtCursor = (text) => {
     const textarea = elements.input;
+    if (!textarea) return;
+    
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const textBefore = textarea.value.substring(0, start);
@@ -737,14 +134,14 @@ const insertAtCursor = (text) => {
 };
 
 const showTextSection = () => {
-    if (window.innerWidth <= 768) {
+    if (window.innerWidth <= 768 && elements.outputSection && elements.textSection) {
         elements.outputSection.classList.add('hide');
         elements.textSection.classList.remove('hide');
     }
 };
 
 const showOutputSection = () => {
-    if (window.innerWidth <= 768) {
+    if (window.innerWidth <= 768 && elements.outputSection && elements.textSection) {
         elements.textSection.classList.add('hide');
         elements.outputSection.classList.remove('hide');
     }
@@ -752,46 +149,15 @@ const showOutputSection = () => {
 
 // --- Canvas Drawing Functions ---
 const clearCanvas = () => {
-    lineCtx.clearRect(0, 0, elements.lineCanvas.width, elements.lineCanvas.height);
+    if (lineCtx && elements.lineCanvas) {
+        lineCtx.clearRect(0, 0, elements.lineCanvas.width, elements.lineCanvas.height);
+    }
 };
 
+// updateCanvasは赤い線を描画しないよう変更
 const updateCanvas = () => {
-    const canvas = elements.lineCanvas;
-    const ctx = lineCtx;
-    const grid = elements.dotGrid;
-    if (!grid || !canvas) return;
-    
-    // 確実にキャンバスのサイズを設定
-    if (canvas.width === 0 || canvas.height === 0) {
-        resizeCanvas();
-    }
-    
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const gridRect = grid.getBoundingClientRect();
-
-    const numericDotsToConnect = [];
-    drawState.detectedDots.forEach(dot => {
-        if (dot.classList.contains('numeric')) numericDotsToConnect.push(dot);
-    });
-
-    if (numericDotsToConnect.length < 1) return;
-
-    ctx.beginPath();
-    ctx.strokeStyle = CONFIG.visual.lineColor;
-    ctx.lineWidth = CONFIG.visual.lineWidth;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    let isFirst = true;
-    numericDotsToConnect.forEach(dot => {
-        const rect = dot.getBoundingClientRect();
-        const x = (rect.left - gridRect.left) + rect.width / 2;
-        const y = (rect.top - gridRect.top) + rect.height / 2;
-        if (isFirst) ctx.moveTo(x, y), isFirst = false;
-        else ctx.lineTo(x, y);
-    });
-
-    if (!isFirst) ctx.stroke();
+    // 線の描画を無効化 - ドットのハイライトのみで十分
+    return;
 };
 
 // --- Gesture Logic Functions ---
@@ -800,12 +166,10 @@ resetDrawState = (keepActive = false) => {
     drawState.detectedDots.forEach(dot => dot.classList.remove('detected'));
     drawState.detectedDots.clear();
     drawState.totalValue = 0;
-    drawState.isLongPress = false;
     drawState.currentStrokeDetected = false;
     if (!keepActive) drawState.lastStrokeTime = 0;
-    clearTimeout(drawState.longPressTimer);
     clearTimeout(drawState.strokeTimer);
-    drawState.longPressTimer = drawState.strokeTimer = null;
+    drawState.strokeTimer = null;
 };
 
 const recognizeLetter = (totalValue) => {
@@ -813,6 +177,18 @@ const recognizeLetter = (totalValue) => {
     if (recognized && CONFIG.debug) debugLog(`認識: 値=${totalValue}, 文字=${recognized}`);
     else if (CONFIG.debug) debugLog(`認識失敗: 値=${totalValue}`);
     return recognized;
+};
+
+const showRecognitionFeedback = (character) => {
+    if (!elements.d2dArea || !character) return;
+    
+    const fb = document.createElement('div');
+    fb.className = 'recognition-feedback';
+    fb.textContent = character;
+    elements.d2dArea.appendChild(fb);
+    
+    // CSS側でアニメーションと表示サイズを制御するので、ここではスタイル設定不要
+    setTimeout(() => fb.remove(), 800);
 };
 
 const endDrawing = () => {
@@ -828,11 +204,7 @@ const endDrawing = () => {
                     const rec = recognizeLetter(drawState.totalValue);
                     if (rec) {
                         insertAtCursor(rec);
-                        const fb = document.createElement('div');
-                        fb.className = 'recognition-feedback';
-                        fb.textContent = rec;
-                        elements.d2dArea.appendChild(fb);
-                        setTimeout(() => fb.remove(), 800);
+                        showRecognitionFeedback(rec);
                     }
                 }
                 resetDrawState();
@@ -853,7 +225,7 @@ const addDetectedDot = (dot) => {
 };
 
 const detectDot = (x, y) => {
-    if (!drawState.isActive) return;
+    if (!drawState.isActive || !elements.dotGrid) return;
     const now = Date.now();
     if (now - drawState.lastDetectionTime < CONFIG.sensitivity.debounceTime) return;
     drawState.lastDetectionTime = now;
@@ -868,15 +240,13 @@ const detectDot = (x, y) => {
         const cy = r.top + r.height / 2;
         const dist = Math.hypot(x - cx, y - cy);
         
-        // モバイルではヒット判定を少し大きく
-        const hitRadius = isMobileDevice() ? CONFIG.sensitivity.hitRadius * 1.2 : CONFIG.sensitivity.hitRadius;
+        // ヒット判定
+        const hitRadius = CONFIG.sensitivity.hitRadius;
         
         if (dist <= hitRadius) {
             addDetectedDot(dot);
         }
     });
-
-    updateCanvas();
 };
 
 const startDrawing = (dotEl, x, y) => {
@@ -890,12 +260,13 @@ const startDrawing = (dotEl, x, y) => {
     drawState.startY = y;
     drawState.lastDetectionTime = now;
     addDetectedDot(dotEl);
-    updateCanvas();
 };
 
 // --- Event Handlers ---
 const handleDeleteAction = (deleteToken = false) => {
     const ta = elements.input;
+    if (!ta) return;
+    
     const pos = ta.selectionStart;
     if (pos > 0) {
         let before = ta.value.substring(0, pos);
@@ -910,18 +281,18 @@ const handleDeleteAction = (deleteToken = false) => {
         ta.selectionStart = ta.selectionEnd = before.length;
     }
     showTextSection();
-    elements.input.focus();
+    if (ta) ta.focus();
 };
 
 const handleSpecialButtonClick = (e, type, actions) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     const now = Date.now();
     if (specialButtonState.clickTarget === type &&
         now - specialButtonState.lastClickTime < specialButtonState.doubleClickDelay) {
         clearTimeout(specialButtonState.clickTimer);
         specialButtonState.clickCount = 0;
         specialButtonState.clickTarget = null;
-        actions.double();
+        if (actions.double) actions.double();
         if (CONFIG.debug) debugLog(`ダブルクリック: ${type}`);
     } else {
         specialButtonState.clickCount = 1;
@@ -929,7 +300,7 @@ const handleSpecialButtonClick = (e, type, actions) => {
         specialButtonState.clickTarget = type;
         specialButtonState.clickTimer = setTimeout(() => {
             if (specialButtonState.clickCount === 1) {
-                actions.single();
+                if (actions.single) actions.single();
                 if (CONFIG.debug) debugLog(`シングルクリック: ${type}`);
             }
             specialButtonState.clickCount = 0;
@@ -938,39 +309,23 @@ const handleSpecialButtonClick = (e, type, actions) => {
     }
 };
 
-const handleSpecialButtonLongPress = (e, btn, action) => {
-    e.preventDefault();
-    const t = setTimeout(() => {
-        action();
-        btn.classList.add('long-pressed');
-        if (CONFIG.debug) debugLog(`長押し: ${btn.dataset.action || btn.dataset.digit}`);
-        setTimeout(() => btn.classList.remove('long-pressed'), 200);
-    }, CONFIG.timing.longPressDuration);
-
-    const clear = () => {
-        clearTimeout(t);
-        btn.removeEventListener('pointerup', clear);
-        btn.removeEventListener('pointercancel', clear);
-        btn.removeEventListener('pointerleave', clear);
-    };
-    btn.addEventListener('pointerup', clear);
-    btn.addEventListener('pointercancel', clear);
-    btn.addEventListener('pointerleave', clear);
-};
-
 const executeCode = () => {
-    const code = elements.input.value;
+    const code = elements.input ? elements.input.value : '';
     if (!code.trim()) return;
     try {
         const result = shikigamiInterpreter.execute(code);
-        elements.output.value = result !== undefined ? result : "実行完了";
-        elements.output.classList.add('executed');
-        setTimeout(() => elements.output.classList.remove('executed'), 300);
+        if (elements.output) {
+            elements.output.value = result !== undefined ? result : "実行完了";
+            elements.output.classList.add('executed');
+            setTimeout(() => elements.output.classList.remove('executed'), 300);
+        }
         showOutputSection();
-        if (!result.startsWith("エラー:")) elements.input.value = "";
+        if (!result.startsWith("エラー:") && elements.input) elements.input.value = "";
         if (CONFIG.debug) debugLog(`コード実行: ${code.substring(0, 20)}${code.length > 20 ? '...' : ''}`);
     } catch (err) {
-        elements.output.value = `エラー: ${err.message}`;
+        if (elements.output) {
+            elements.output.value = `エラー: ${err.message}`;
+        }
         showOutputSection();
         if (CONFIG.debug) debugLog(`実行エラー: ${err.message}`);
     }
@@ -992,73 +347,87 @@ const setupKeyboardHandlers = () => {
     });
 };
 
-const handlePointerDown = (e, el) => {
-    e.preventDefault();
+// ダブルタップ入力処理
+const handleDoubleTap = (el) => {
+    const digit = el.dataset.digit;
+    const word = el.dataset.word;
     
-    // ポインタID記録 - ポインタキャプチャ成功に関わらず
+    if (digit || word) {
+        insertAtCursor(digit || word);
+        el.classList.add('double-tapped');
+        setTimeout(() => el.classList.remove('double-tapped'), 200);
+        
+        if (CONFIG.debug) debugLog(`ダブルタップ入力: ${digit || word}`);
+    }
+};
+
+// ポインタイベント処理の改善
+const handlePointerDown = (e, el) => {
+    if (e && e.preventDefault) e.preventDefault();
+    
+    // ポインタID記録
     drawState.currentTouchId = e.pointerId;
-    drawState.pointerStartTime = Date.now();
     drawState.pointerStartX = e.clientX;
     drawState.pointerStartY = e.clientY;
     
-    // ポインタキャプチャを試みるが、失敗しても続行
+    // ポインタキャプチャを試みる
     try { 
-        if (!el.hasPointerCapture(e.pointerId)) {
+        if (el && !el.hasPointerCapture(e.pointerId)) {
             el.setPointerCapture(e.pointerId);
             el.dataset.pointerId = e.pointerId;
         } 
     } catch (err) { 
         console.log("Pointer capture not supported or failed:", err);
-        // キャプチャなしで続行
     }
 
     showTextSection();
-    drawState.isLongPress = false;
-
-    const digit = el.dataset.digit;
-    const word = el.dataset.word;
-    if (digit || word) {
-        clearTimeout(drawState.longPressTimer);
-        drawState.longPressTimer = setTimeout(() => {
-            const dist = Math.hypot(e.clientX - drawState.pointerStartX, e.clientY - drawState.pointerStartY);
-            if (dist < CONFIG.sensitivity.minSwipeDistance && (!drawState.isActive || drawState.detectedDots.size <= 1)) {
-                insertAtCursor(digit || word);
-                drawState.isLongPress = true;
-                resetDrawState();
-                clearCanvas();
-                if (CONFIG.debug) debugLog(`長押し入力: ${digit || word}`);
-            }
-        }, CONFIG.timing.longPressDuration);
+    
+    // ダブルタップ検出
+    const now = Date.now();
+    if (tapState.lastTapElement === el && 
+        now - tapState.lastTapTime < tapState.doubleTapDelay) {
+        // ダブルタップを検出
+        handleDoubleTap(el);
+        
+        // ダブルタップ検出後は状態をリセット
+        tapState.lastTapTime = 0;
+        tapState.lastTapElement = null;
+        return; // ダブルタップ後は描画開始しない
+    } else {
+        // シングルタップを記録
+        tapState.lastTapTime = now;
+        tapState.lastTapElement = el;
+        
+        // dot-grid内のドットの場合は描画を開始
+        if (el.closest('#dot-grid')) {
+            startDrawing(el, e.clientX, e.clientY);
+        }
     }
-
-    if (el.closest('#dot-grid')) startDrawing(el, e.clientX, e.clientY);
 };
 
 const handlePointerMove = (e) => {
-    if (!drawState.isActive || e.pointerId !== drawState.currentTouchId) return;
-    
-    // モバイル用のより強力なイベント抑止
-    if (isMobileDevice()) {
-        e.stopPropagation();
-        e.preventDefault();
-    }
+    if (e.pointerId !== drawState.currentTouchId) return;
     
     const dx = e.clientX - drawState.pointerStartX;
     const dy = e.clientY - drawState.pointerStartY;
-    if (Math.hypot(dx, dy) >= CONFIG.sensitivity.minSwipeDistance) {
-        clearTimeout(drawState.longPressTimer);
-        drawState.longPressTimer = null;
+    
+    // 移動検出時、描画中なら検出を継続
+    if (Math.hypot(dx, dy) >= CONFIG.sensitivity.minSwipeDistance && drawState.isActive) {
+        // 移動を検出したらダブルタップの可能性をクリア
+        tapState.lastTapTime = 0;
+        tapState.lastTapElement = null;
+        
         detectDot(e.clientX, e.clientY);
     }
 };
 
 const handlePointerUp = (e) => {
     if (e.pointerId !== drawState.currentTouchId) return;
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     
     // ポインタキャプチャ解放
     const el = document.querySelector(`[data-pointer-id="${e.pointerId}"]`);
-    if (el && el.hasPointerCapture(e.pointerId)) {
+    if (el && el.hasPointerCapture && el.hasPointerCapture(e.pointerId)) {
         try { 
             el.releasePointerCapture(e.pointerId); 
             delete el.dataset.pointerId; 
@@ -1067,12 +436,11 @@ const handlePointerUp = (e) => {
         }
     }
     
-    clearTimeout(drawState.longPressTimer);
-    if (drawState.isActive && !drawState.isLongPress) endDrawing();
-    else if (drawState.isLongPress) {
-        resetDrawState();
-        clearCanvas();
+    // 描画終了処理
+    if (drawState.isActive) {
+        endDrawing();
     }
+    
     drawState.currentTouchId = null;
 };
 
@@ -1083,69 +451,62 @@ const setupDotEventListeners = () => {
     });
 };
 
+// 特殊ボタン用のイベントリスナー
 const setupSpecialButtonListeners = () => {
-    const deleteBtn = elements.specialRow.querySelector('[data-action="delete"]');
-    const zeroBtn   = elements.specialRow.querySelector('[data-digit="0"]');
-    const spaceBtn  = elements.specialRow.querySelector('[data-action="space"]');
+    const deleteBtn = elements.specialRow ? elements.specialRow.querySelector('[data-action="delete"]') : null;
+    const zeroBtn = elements.specialRow ? elements.specialRow.querySelector('[data-digit="0"]') : null;
+    const spaceBtn = elements.specialRow ? elements.specialRow.querySelector('[data-action="space"]') : null;
 
     if (deleteBtn) {
         deleteBtn.addEventListener('pointerdown', e => {
-            e.preventDefault();
-            handleSpecialButtonLongPress(e, deleteBtn, () => {});
+            if (e && e.preventDefault) e.preventDefault();
         });
+        
         deleteBtn.addEventListener('click', e => handleSpecialButtonClick(e, 'delete', {
             single: () => handleDeleteAction(false),
-            double: () => handleDeleteAction(true),
-            long:   () => {}
+            double: () => handleDeleteAction(true)
         }));
     }
 
     if (zeroBtn) {
-        zeroBtn.addEventListener('pointerdown', e => {
-            e.preventDefault();
-            handleSpecialButtonLongPress(e, zeroBtn, () => {});
-        });
-        zeroBtn.addEventListener('click', e => handleSpecialButtonClick(e, 'zero', {
-            single: () => insertAtCursor('0'),
-            double: () => {},
-            long:   () => {}
-        }));
+        // 0 ボタンはdot-gridの数字と同じ扱い
+        zeroBtn.addEventListener('pointerdown', e => handlePointerDown(e, zeroBtn), { passive: false });
     }
 
     if (spaceBtn) {
         spaceBtn.addEventListener('pointerdown', e => {
-            e.preventDefault();
-            handleSpecialButtonLongPress(e, spaceBtn, () => {});
+            if (e && e.preventDefault) e.preventDefault();
         });
+        
         spaceBtn.addEventListener('click', e => handleSpecialButtonClick(e, 'space', {
             single: () => insertAtCursor(' '),
-            double: () => insertAtCursor('\n'),
-            long:   () => {}
+            double: () => insertAtCursor('\n')
         }));
     }
 };
 
 const setupExecuteButtonListener = () => {
-    elements.executeButton.addEventListener('click', executeCode);
+    if (elements.executeButton) {
+        elements.executeButton.addEventListener('click', executeCode);
+    }
 };
 
 const resizeCanvas = () => {
     const d2dArea = elements.d2dArea;
-    if (!d2dArea || !elements.lineCanvas) return;
+    const canvas = elements.lineCanvas;
+    if (!d2dArea || !canvas) return;
     
     const rect = d2dArea.getBoundingClientRect();
     const style = window.getComputedStyle(d2dArea);
     const pl = parseFloat(style.paddingLeft) || 0;
     const pt = parseFloat(style.paddingTop) || 0;
     
-    elements.lineCanvas.width = d2dArea.clientWidth - (pl * 2);
-    elements.lineCanvas.height = d2dArea.clientHeight - (pt * 2);
-    elements.lineCanvas.style.left = `${pl}px`;
-    elements.lineCanvas.style.top = `${pt}px`;
+    canvas.width = d2dArea.clientWidth - (pl * 2);
+    canvas.height = d2dArea.clientHeight - (pt * 2);
+    canvas.style.left = `${pl}px`;
+    canvas.style.top = `${pt}px`;
     
-    // キャンバス再描画を強制
     clearCanvas();
-    updateCanvas();
 };
 
 const setupGestureListeners = () => {
@@ -1154,7 +515,7 @@ const setupGestureListeners = () => {
     document.addEventListener('pointercancel', handlePointerUp, { passive: false });
 };
 
-// --- Debug Interface & Helpers ---
+// --- Debug Helper ---
 const debugLog = (msg) => {
     if (!CONFIG.debug) return;
     const out = document.getElementById('debug-output');
@@ -1165,20 +526,11 @@ const debugLog = (msg) => {
     while (out.children.length > 10) out.removeChild(out.lastChild);
 };
 
-const addSliderControl = (parent, id, label, min, max, val, onChange) => {
-    const c = document.createElement('div'); c.className = 'control-container';
-    const l = document.createElement('label'); l.htmlFor = `control-${id}`; l.textContent = `${label}: `;
-    const s = document.createElement('input'); s.type = 'range'; s.id = `control-${id}`; s.min = min; s.max = max; s.value = val;
-    const v = document.createElement('span'); v.className = 'value-display'; v.textContent = val;
-    s.addEventListener('input', () => { v.textContent = s.value; onChange(s.value); });
-    c.appendChild(l); c.appendChild(s); c.appendChild(v);
-    parent.appendChild(c);
-};
-
 const updateConfigStyles = () => {
     const existing = document.getElementById('dynamic-config-styles');
     if (existing) existing.remove();
-    const s = document.createElement('style'); s.id = 'dynamic-config-styles';
+    const s = document.createElement('style'); 
+    s.id = 'dynamic-config-styles';
     s.textContent = `
         .dot {
             width: ${CONFIG.layout.dotSize}px;
@@ -1187,93 +539,19 @@ const updateConfigStyles = () => {
         .dot.detected {
             background-color: ${CONFIG.visual.detectedColor};
         }
+        .dot.double-tapped {
+            background-color: #fde68a;
+            transform: scale(0.95);
+            transition: background-color 0.2s, transform 0.2s;
+        }
         #line-canvas { pointer-events: none; }
+        .recognition-feedback {
+            width: ${CONFIG.visual.feedbackSize}px;
+            height: ${CONFIG.visual.feedbackSize}px;
+            font-size: ${CONFIG.visual.feedbackTextSize}px;
+        }
     `;
     document.head.appendChild(s);
-};
-
-const setupDebugInterface = () => {
-    if (!CONFIG.debug || window.innerWidth <= 768) return;
-    const section = document.createElement('section');
-    section.id = 'debug-panel';
-    const h2 = document.createElement('h2'); h2.textContent = 'debug controls';
-    section.appendChild(h2);
-
-    addSliderControl(section, 'hitRadius', 'Hit Radius', 5, 50, CONFIG.sensitivity.hitRadius, v => CONFIG.sensitivity.hitRadius = Number(v));
-    addSliderControl(section, 'minSwipe', 'Min Swipe', 1, 20, CONFIG.sensitivity.minSwipeDistance, v => CONFIG.sensitivity.minSwipeDistance = Number(v));
-    addSliderControl(section, 'multiStroke', 'Multi-Stroke Timeout', 100, 2000, CONFIG.timing.multiStrokeTimeout, v => { CONFIG.timing.multiStrokeTimeout = Number(v); });
-    addSliderControl(section, 'longPress', 'Long Press Duration', 100, 1000, CONFIG.timing.longPressDuration, v => CONFIG.timing.longPressDuration = Number(v));
-    addSliderControl(section, 'debounce', 'Debounce Time', 10, 200, CONFIG.sensitivity.debounceTime, v => CONFIG.sensitivity.debounceTime = Number(v));
-    addSliderControl(section, 'dotSize', 'Dot Size', 30, 80, CONFIG.layout.dotSize, v => { CONFIG.layout.dotSize = Number(v); updateConfigStyles(); initKeypad(); });
-    addSliderControl(section, 'dotGap', 'Dot Gap', 5, 30, CONFIG.layout.dotGap, v => { CONFIG.layout.dotGap = Number(v); updateConfigStyles(); initKeypad(); });
-
-    const sampleCodes = {
-        'FizzBuzz': `# FizzBuzz サンプル
-FIZZBUZZ => (MAX) => {
-    RESULT => []
-    RANGE(1, MAX).forEach((X) => {
-        OUTPUT => 
-            X % 15 == 0 ? "FizzBuzz"
-            : X % 3 == 0 ? "Fizz"
-            : X % 5 == 0 ? "Buzz"
-            : X.toString()
-        RESULT.push(OUTPUT)
-    })
-    RESULT
-}
-PRINT(FIZZBUZZ(20).join(", "))`,
-        '計算例': `# 分数計算
-A => 3/4
-B => 1/2
-SUM => A + B
-PRINT("合計: " + SUM)
-
-# 配列処理
-NUMBERS => [1, 2, 3, 4, 5]
-DOUBLED => NUMBERS |> MAP((X) => X * 2)
-PRINT(DOUBLED)`
-    };
-    const btnContainer = document.createElement('div');
-    btnContainer.style.display = 'flex';
-    btnContainer.style.gap = '10px';
-    btnContainer.style.marginBottom = '10px';
-    for (const [name, code] of Object.entries(sampleCodes)) {
-        const btn = document.createElement('button');
-        btn.textContent = name;
-        btn.style.padding = '5px 10px';
-        btn.style.border = '1px solid #ccc';
-        btn.style.borderRadius = '4px';
-        btn.style.cursor = 'pointer';
-        btn.addEventListener('click', () => { elements.input.value = code; });
-        btnContainer.appendChild(btn);
-    }
-    section.appendChild(btnContainer);
-
-    const debugOut = document.createElement('div');
-    debugOut.id = 'debug-output';
-    debugOut.className = 'debug-output';
-    section.appendChild(debugOut);
-
-    document.querySelector('article').appendChild(section);
-};
-
-const initResponsiveLayout = () => {
-    window.addEventListener('resize', () => {
-        if (window.innerWidth <= 768) {
-            const dp = document.getElementById('debug-panel');
-            if (dp) dp.style.display = 'none';
-        } else {
-            const dp = document.getElementById('debug-panel');
-            if (dp && CONFIG.debug) dp.style.display = 'block';
-            elements.outputSection.classList.remove('hide');
-            elements.textSection.classList.remove('hide');
-        }
-        resizeCanvas();
-    });
-    if (window.innerWidth <= 768) {
-        elements.outputSection.classList.add('hide');
-        elements.textSection.classList.remove('hide');
-    }
 };
 
 // --- ドット配置の設定 ---
@@ -1307,6 +585,8 @@ const dotWordMapping = {
 
 // --- Keypad Initialization ---
 function initKeypad() {
+    if (!elements.dotGrid || !elements.specialRow) return;
+    
     elements.dotGrid.innerHTML = '';
     elements.specialRow.innerHTML = '';
     elements.dotGrid.style.gap = `${CONFIG.layout.dotGap}px`;
@@ -1363,16 +643,13 @@ function initKeypad() {
     spaceBtn.title = '空白';
     elements.specialRow.appendChild(spaceBtn);
 
-    elements.d2dArea.tabIndex = -1;
+    if (elements.d2dArea) elements.d2dArea.tabIndex = -1;
 
-    elements.input.addEventListener('focus', e => {
-        if (!e.isTrusted) elements.d2dArea.focus();
-    });
-    
-    elements.d2dArea.addEventListener('touchstart', (e) => {
-        if (document.activeElement === elements.input) elements.d2dArea.focus();
-        showTextSection();
-    }, { passive: false });
+    if (elements.input) {
+        elements.input.addEventListener('focus', e => {
+            if (!e.isTrusted && elements.d2dArea) elements.d2dArea.focus();
+        });
+    }
 
     updateConfigStyles();
     resizeCanvas();
@@ -1382,19 +659,22 @@ function initKeypad() {
     setupGestureListeners();
 }
 
+const initResponsiveLayout = () => {
+    window.addEventListener('resize', () => {
+        resizeCanvas();
+    });
+    if (window.innerWidth <= 768) {
+        if (elements.outputSection) elements.outputSection.classList.add('hide');
+        if (elements.textSection) elements.textSection.classList.remove('hide');
+    }
+};
+
 // --- Initialization on load ---
 window.onload = () => {
-    // モバイル環境用の調整を適用
-    adjustForMobile();
-    
     initKeypad();
     initResponsiveLayout();
-    setupDebugInterface();
     setupExecuteButtonListener();
     setupKeyboardHandlers();
-    
-    // 自動フォーマット機能の初期化
-    codeFormatter.setupAutoFormat(elements.input);
     
     // キャンバスのリサイズ
     resizeCanvas();
