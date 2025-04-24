@@ -1,59 +1,3 @@
-:root {
-    /* カラーパレット (元のスタイルシートの色を定義) */
-    --color-body-bg: #f0f0f0;
-    --color-article-bg: #ffffff;
-    --color-section-border: #a0a0a0; /* Medium Grey */
-    --color-border-light: #cccccc; /* Light Grey */
-    --color-surface-light: #f8f8f8; /* Very Light Grey */
-    --color-output-executed-bg: #d1fae5; /* Light Green */
-    --color-dot-numeric-bg: #fee2e2; /* Light Pink-Red */
-    --color-dot-numeric-text: #ef4444; /* Red */
-    --color-dot-word-bg: #dbeafe; /* Light Blue */
-    --color-dot-word-text: #3b82f6; /* Blue */
-    --color-dot-detected-bg: #fca5a5; /* Pink */
-    --color-special-button-bg: #e5e7eb; /* Light Grey-Blue */
-    --color-special-button-delete-space-bg: var(--color-surface-light);
-    --color-special-button-long-pressed-bg: #fde68a; /* Light Yellow */
-    --color-special-button-combined-pressed-bg: #93c5fd; /* Light Blue */
-    --color-execute-button-bg: var(--color-dot-word-text); /* Use the same blue as word dot text */
-    --color-execute-button-hover-bg: #2563eb; /* Darker Blue */
-    --color-execute-button-active-bg: #1d4ed8; /* Even Darker Blue */
-    --color-debug-panel-bg: #f8fafc; /* Very Light Blue-Grey */
-    --color-debug-panel-border: #cbd5e1; /* Light Blue-Grey Border */
-    --color-debug-output-bg: #f1f5f9; /* Light Blue-Grey */
-    --color-text-muted: #a0a0a0; /* Muted Text Color (used for h2) */
-    --color-dot-text-muted: #aaa; /* Even Lighter Grey for default dot text */
-
-    /* スペーシング */
-    --space-xs: 5px;
-    --space-sm: 8px;
-    --space-md: 10px;
-    --space-lg: 20px;
-
-    /* サイズ */
-    --size-max-width-article: 800px;
-    --size-min-height-input-output: 80px;
-    --size-height-input-output-desktop: 500px; /* Desktop default */
-    --size-max-height-input-output: 300px;
-    --size-min-height-upper-half: 120px;
-    --size-dot: 45px;
-    --size-special-button-width: 100px;
-    --size-special-button-height: 45px;
-    --size-execute-button-width: 100px;
-    --size-min-width-control-label: 120px;
-    --size-min-width-value-display: 40px;
-    --size-max-height-debug-output: 150px;
-    --size-feedback-circle: 80px;
-    --size-feedback-text: 32px;
-
-    /* ボーダーラディウス */
-    --radius-sm: 4px;
-    --radius-md: 5px;
-    --radius-lg: 10px;
-    --radius-round: 50%;
-}
-
-
 /* Apply border-box sizing globally */
 *,
 *::before,
@@ -66,20 +10,20 @@
 body {
     overscroll-behavior: none;
     text-align: center;
-    background-color: var(--color-body-bg);
+    background-color: #f0f0f0;
     font-family: sans-serif;
-    touch-action: pan-x pan-y;
+    touch-action: manipulation;
 }
 
 /* Main layout container */
 article {
     width: 100%;
-    max-width: var(--size-max-width-article);
+    max-width: 800px;
     display: flex;
     flex-direction: column;
     margin: 0 auto;
-    background-color: var(--color-article-bg);
-    padding: var(--space-md);
+    background-color: #ffffff;
+    padding: 10px;
     text-align: left;
 }
 
@@ -87,16 +31,15 @@ h1 {
     text-align: center;
 }
 
-
 h2 {
     text-align: left;
-    color: var(--color-text-muted); /* Original #ccc, mapping to a muted text var */
+    color: #a0a0a0;
 }
 
 section {
-    border: 2px dotted var(--color-section-border);
-    padding: var(--space-md);
-    margin: var(--space-md) 0 var(--space-md) 0;
+    border: 2px dotted #a0a0a0;
+    padding: 10px;
+    margin: 10px 0 10px 0;
 }
 
 section:last-child {
@@ -107,36 +50,35 @@ section:last-child {
 #output,
 #txt-input {
     width: 100%;
-    padding: var(--space-sm);
-    border: 1px solid var(--color-border-light);
-    border-radius: var(--radius-sm);
+    padding: 8px;
+    border: 1px solid #cccccc;
+    border-radius: 4px;
     display: block;
-    margin-top: var(--space-xs);
+    margin-top: 5px;
 }
-
 
 #output {
     resize: vertical;
-    min-height: var(--size-min-height-input-output);
-    height: var(--size-height-input-output-desktop); /* Desktop default height */
-    max-height: var(--size-max-height-input-output);
-    background-color: var(--color-surface-light);
+    min-height: 80px;
+    height: 500px; /* Desktop default height */
+    max-height: 300px;
+    background-color: #f8f8f8;
     transition: background-color 0.3s;
     overflow-y: auto;
 }
 
 #txt-input {
     resize: vertical;
-    min-height: var(--size-min-height-input-output);
-    height: var(--size-height-input-output-desktop); /* Desktop default height */
-    max-height: var(--size-max-height-input-output);
+    min-height: 80px;
+    height: 500px; /* Desktop default height */
+    max-height: 300px;
     transition: background-color 0.3s;
     overflow-y: auto;
     font-family: monospace;
 }
 
 #output.executed {
-    background-color: var(--color-output-executed-bg);
+    background-color: #d1fae5;
     transition: background-color 0.3s;
 }
 
@@ -148,57 +90,62 @@ section:last-child {
 
 #upper-half {
     flex: 1;
-    min-height: var(--size-min-height-upper-half);
+    min-height: 120px;
 }
-
 
 #d2d-input {
     position: relative;
     user-select: none;
-    margin-top: var(--space-xs);
+    margin-top: 5px;
+    touch-action: none; /* モバイルでのスクロールを防止 */
+}
+
+#d2d-section {
+    touch-action: none; /* タッチイベントを明示的に防止 */
 }
 
 #dot-grid {
     display: flex;
     flex-direction: column;
-    gap: var(--space-md);
-    margin-bottom: var(--space-md);
+    gap: 10px;
+    margin-bottom: 10px;
     align-items: center;
 }
 
 .dot-row {
     display: flex;
     justify-content: center;
-    gap: var(--space-md);
+    gap: 10px;
 }
 
 .dot {
-    width: var(--size-dot);
-    height: var(--size-dot);
-    border-radius: var(--radius-round);
-    border: 1px solid var(--color-border-light);
-    background-color: var(--color-surface-light);
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    border: 1px solid #cccccc;
+    background-color: #f8f8f8;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 10px;
     font-weight: bold;
-    color: var(--color-dot-text-muted); /* Original #aaa */
+    color: #aaa;
     cursor: pointer;
     position: relative;
     transition: background-color 0.1s;
     flex-shrink: 0;
+    touch-action: none; /* タッチ操作のスクロール防止 */
 }
 
 .dot.numeric {
-    background-color: var(--color-dot-numeric-bg);
-    color: var(--color-dot-numeric-text);
+    background-color: #fee2e2;
+    color: #ef4444;
     font-size: 16px;
 }
 
 .dot.word-dot {
-    background-color: var(--color-dot-word-bg);
-    color: var(--color-dot-word-text);
+    background-color: #dbeafe;
+    color: #3b82f6;
     font-size: 12px;
     overflow: hidden;
     text-align: center;
@@ -206,55 +153,54 @@ section:last-child {
 }
 
 .dot.detected {
-    background-color: var(--color-dot-detected-bg);
-    border-color: var(--color-dot-numeric-text); /* Original #ef4444 */
+    background-color: #fca5a5;
+    border-color: #ef4444;
 }
 
 #special-row {
     display: flex;
     justify-content: center;
-    gap: var(--space-md);
-    margin-top: var(--space-md);
+    gap: 10px;
+    margin-top: 10px;
 }
 
 .special-button {
-    width: var(--size-special-button-width);
-    height: var(--size-special-button-height);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--color-border-light);
+    width: 100px;
+    height: 45px;
+    border-radius: 10px;
+    border: 1px solid #cccccc;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 16px;
     font-weight: bold;
     cursor: pointer;
-    background-color: var(--color-special-button-bg);
+    background-color: #e5e7eb;
     flex-shrink: 0;
     transition: transform 0.1s, background-color 0.1s;
+    touch-action: none; /* タッチ操作のスクロール防止 */
 }
 
 .special-button.delete {
-    background-color: var(--color-special-button-delete-space-bg);
+    background-color: #f8f8f8;
 }
 
 .special-button.space {
-    background-color: var(--color-special-button-delete-space-bg);
+    background-color: #f8f8f8;
 }
 
 .special-button.long-pressed {
-    background-color: var(--color-special-button-long-pressed-bg);
+    background-color: #fde68a;
     transform: scale(0.95);
 }
 
 .special-button.combined-pressed {
-    background-color: var(--color-special-button-combined-pressed-bg);
+    background-color: #93c5fd;
     transform: scale(0.95);
 }
 
 #special-row .dot.numeric {
      flex-shrink: 0;
-     /* Note: original CSS had no specific styles for numeric dots within special-row,
-              so it inherits the general .dot.numeric style */
 }
 
 #line-canvas {
@@ -270,13 +216,13 @@ section:last-child {
 /* Execute Button Style */
 #execute-button {
     display: block;
-    width: var(--size-execute-button-width);
-    padding: var(--space-md);
-    margin: var(--space-md) auto;  /* 中央寄せ */
-    background-color: var(--color-execute-button-bg);
-    color: white; /* Original was white, keep as literal or define --color-white */
+    width: 100px;
+    padding: 10px;
+    margin: 10px auto;  /* 中央寄せ */
+    background-color: #3b82f6;
+    color: white;
     border: none;
-    border-radius: var(--radius-sm);
+    border-radius: 4px;
     font-size: 16px;
     font-weight: bold;
     cursor: pointer;
@@ -284,48 +230,48 @@ section:last-child {
 }
 
 #execute-button:hover {
-    background-color: var(--color-execute-button-hover-bg);
+    background-color: #2563eb;
 }
 
 #execute-button:active {
-    background-color: var(--color-execute-button-active-bg);
+    background-color: #1d4ed8;
 }
 
 /* Debug Panel Styles */
 #debug-panel {
-    margin-top: var(--space-lg);
-    padding: var(--space-md);
-    background-color: var(--color-debug-panel-bg);
-    border: 1px solid var(--color-debug-panel-border);
-    border-radius: var(--radius-md);
+    margin-top: 20px;
+    padding: 10px;
+    background-color: #f8fafc;
+    border: 1px solid #cbd5e1;
+    border-radius: 5px;
 }
 
 .control-container {
     display: flex;
     align-items: center;
-    margin: var(--space-sm) 0;
+    margin: 8px 0;
 }
 
 .control-container label {
-    min-width: var(--size-min-width-control-label);
+    min-width: 120px;
 }
 
 .control-container input[type="range"] {
     flex-grow: 1;
-    margin: 0 var(--space-md);
+    margin: 0 10px;
 }
 
 .value-display {
-    min-width: var(--size-min-width-value-display);
+    min-width: 40px;
     text-align: right;
 }
 
 .debug-output {
-    margin-top: var(--space-md);
-    padding: var(--space-md);
-    background-color: var(--color-debug-output-bg);
-    border-radius: var(--radius-sm);
-    max-height: var(--size-max-height-debug-output);
+    margin-top: 10px;
+    padding: 10px;
+    background-color: #f1f5f9;
+    border-radius: 4px;
+    max-height: 150px;
     overflow-y: auto;
     font-family: monospace;
     font-size: 12px;
@@ -336,16 +282,16 @@ section:last-child {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background-color: rgba(255, 255, 255, 0.9); /* Original rgba */
-    border-radius: var(--radius-round);
-    width: var(--size-feedback-circle);
-    height: var(--size-feedback-circle);
+    background-color: rgba(255, 255, 255, 0.9);
+    border-radius: 50%;
+    width: 80px;
+    height: 80px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: var(--size-feedback-text);
+    font-size: 32px;
     font-weight: bold;
-    color: var(--color-dot-word-text); /* Original #3b82f6 */
+    color: #3b82f6;
     animation: fadeOut 0.8s ease-out forwards;
     pointer-events: none;
 }
@@ -370,6 +316,7 @@ section:last-child {
         flex-direction: column;
         /* Assuming 80px header/footer space, adjust if needed */
         height: calc(100vh - 80px);
+        touch-action: none; /* モバイルでのスクロールを防止 */
     }
 
     #upper-half {
@@ -389,14 +336,12 @@ section:last-child {
     #output,
     #txt-input {
         /* Adjusted height for mobile */
-        height: 200px; /* Keep 200px as it was in the original media query */
-        /* min-height: 6rem; was only on #txt-input in original mobile query */
+        height: 200px;
     }
 
     #txt-input {
          min-height: 6rem; /* Original mobile specific min-height */
     }
-
 
     .hide {
         display: none;
@@ -405,12 +350,32 @@ section:last-child {
     #d2d-section {
         height: 50vh;
         min-height: 300px;
+        touch-action: none; /* モバイルでのスクロールを防止 */
     }
 
     #debug-panel {
         display: none;
     }
+
+    /* モバイル用にタッチ操作を調整 */
+    body {
+        touch-action: manipulation; /* 基本的なスクロールは許可するが最適化 */
+        overflow-x: hidden; /* 横スクロール防止 */
+    }
     
+    #d2d-input {
+        touch-action: none; /* d2d-input内でのスクロールを防止 */
+    }
+    
+    .dot, 
+    .special-button {
+        touch-action: none; /* 要素内でのスクロールを防止 */
+    }
+
+    /* モバイルでのタッチ操作時のハイライト無効化 */
+    * {
+        -webkit-tap-highlight-color: transparent;
+    }
 }
 
 @media (min-width: 769px) {
@@ -430,6 +395,6 @@ section:last-child {
     /* Restore desktop heights if they were overridden in mobile */
     #output,
     #txt-input {
-         height: var(--size-height-input-output-desktop);
+         height: 500px;
     }
 }
