@@ -96,7 +96,8 @@ const drawState = {
     pointerStartTime: 0,
     pointerStartX: 0,
     pointerStartY: 0,
-    hasMoved: false // 移動検出フラグ
+    hasMoved: false, // 移動検出フラグ
+    isDrawingMode: false // なぞり書きモードフラグ
 };
 
 // ダブルタップ検出のための状態管理
@@ -186,6 +187,7 @@ resetDrawState = (keepActive = false) => {
     drawState.totalValue = 0;
     drawState.currentStrokeDetected = false;
     drawState.hasMoved = false;
+    drawState.isDrawingMode = false;
     if (!keepActive) drawState.lastStrokeTime = 0;
     clearTimeout(drawState.strokeTimer);
     drawState.strokeTimer = null;
@@ -275,10 +277,13 @@ const startDrawing = (dotEl, x, y) => {
         resetDrawState(true);
     }
     drawState.isActive = true;
+    drawState.isDrawingMode = true; // なぞり書きモードをオン
     drawState.startX = x;
     drawState.startY = y;
     drawState.lastDetectionTime = now;
     addDetectedDot(dotEl);
+    
+    if (CONFIG.debug) debugLog("なぞり書き開始");
 };
 
 // --- Event Handlers ---
@@ -382,7 +387,9 @@ const handleDoubleTap = (el) => {
 
 // ポインタイベント処理の改善
 const handlePointerDown = (e, el) => {
-    if (e && e.preventDefault) e.preventDefault();
+    // イベントが無効な場合は早期リターン
+    if (!e || !el) return;
+    if (e.preventDefault) e.preventDefault();
     
     // ポインタID記録
     drawState.currentTouchId = e.pointerId;
@@ -390,7 +397,7 @@ const handlePointerDown = (e, el) => {
     drawState.pointerStartY = e.clientY;
     drawState.hasMoved = false;
     
-    // ポインタキャプチャを試みる
+    // ポインタキャプチャを試みる - モバイルでより重要
     try { 
         if (el && !el.hasPointerCapture(e.pointerId)) {
             el.setPointerCapture(e.pointerId);
@@ -412,13 +419,12 @@ const handlePointerDown = (e, el) => {
         // ダブルタップ検出後は状態をリセット
         tapState.lastTapTime = 0;
         tapState.lastTapElement = null;
-        return; // ダブルタップ後は描画開始しない
     } else {
         // シングルタップを記録
         tapState.lastTapTime = now;
         tapState.lastTapElement = el;
         
-        // dot-grid内のドットの場合は描画を開始
+        // dot-grid内のドットの場合は描画の準備を開始
         if (el.closest('#dot-grid')) {
             startDrawing(el, e.clientX, e.clientY);
         }
@@ -426,7 +432,8 @@ const handlePointerDown = (e, el) => {
 };
 
 const handlePointerMove = (e) => {
-    if (e.pointerId !== drawState.currentTouchId) return;
+    // イベントが無効または別のポインタIDの場合は無視
+    if (!e || e.pointerId !== drawState.currentTouchId) return;
     
     // モバイル端末では、より小さな動きでも移動と認識
     const minDistance = isMobileDevice() ? 3 : CONFIG.sensitivity.minSwipeDistance;
@@ -444,7 +451,7 @@ const handlePointerMove = (e) => {
         tapState.lastTapElement = null;
         
         // 描画中なら検出を継続
-        if (drawState.isActive) {
+        if (drawState.isActive && drawState.isDrawingMode) {
             detectDot(e.clientX, e.clientY);
             
             // デバッグログ - モバイル環境でのなぞり書き追跡
@@ -456,26 +463,42 @@ const handlePointerMove = (e) => {
 };
 
 const handlePointerUp = (e) => {
-    if (e.pointerId !== drawState.currentTouchId) return;
-    if (e && e.preventDefault) e.preventDefault();
+    // イベントが無効または別のポインタIDの場合は無視
+    if (!e || e.pointerId !== drawState.currentTouchId) return;
+    if (e.preventDefault) e.preventDefault();
     
     // ポインタキャプチャ解放
-    const el = document.querySelector(`[data-pointer-id="${e.pointerId}"]`);
-    if (el && el.hasPointerCapture && el.hasPointerCapture(e.pointerId)) {
-        try { 
+    try {
+        const el = document.querySelector(`[data-pointer-id="${e.pointerId}"]`);
+        if (el && el.hasPointerCapture && el.hasPointerCapture(e.pointerId)) {
             el.releasePointerCapture(e.pointerId); 
             delete el.dataset.pointerId; 
-        } catch (err) { 
-            console.log("Error releasing pointer capture:", err); 
         }
+    } catch (err) { 
+        console.log("Error releasing pointer capture:", err); 
     }
     
-    // 描画終了処理 - 移動が検出された場合のみ
-    if (drawState.isActive && drawState.hasMoved) {
+    // 描画終了処理 - なぞり書きモードの場合のみ
+    if (drawState.isActive && drawState.isDrawingMode) {
+        if (CONFIG.debug) debugLog("なぞり書き終了");
         endDrawing();
     }
     
     drawState.currentTouchId = null;
+};
+
+// マルチタッチサポートのためのイベントリスナー
+const setupMultiTouchSupport = () => {
+    // タッチイベントの場合、デフォルトの動作をキャンセル
+    if (isMobileDevice()) {
+        elements.d2dArea.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+        }, { passive: false });
+        
+        elements.d2dArea.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+        }, { passive: false });
+    }
 };
 
 // --- Event Listener Setup ---
@@ -685,6 +708,7 @@ function initKeypad() {
     setupDotEventListeners();
     setupSpecialButtonListeners();
     setupGestureListeners();
+    setupMultiTouchSupport();
 }
 
 const initResponsiveLayout = () => {
