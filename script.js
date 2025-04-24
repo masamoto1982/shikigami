@@ -3,7 +3,7 @@ const CONFIG = {
     debug: true,
     sensitivity: {
         hitRadius: 22,
-        minSwipeDistance: 5,
+        minSwipeDistance: 5, // モバイルでは小さな値にする必要がある
         debounceTime: 50,
     },
     timing: {
@@ -24,6 +24,9 @@ const CONFIG = {
         // 認識フィードバックのサイズ
         feedbackSize: 120,
         feedbackTextSize: 60
+    },
+    behavior: {
+        autoFocus: false, // 自動フォーカスを無効化
     }
 };
 
@@ -92,7 +95,8 @@ const drawState = {
     currentTouchId: null,
     pointerStartTime: 0,
     pointerStartX: 0,
-    pointerStartY: 0
+    pointerStartY: 0,
+    hasMoved: false // 移動検出フラグ
 };
 
 // ダブルタップ検出のための状態管理
@@ -117,6 +121,16 @@ const keyState = {
     maxTimeDiff: 300
 };
 
+// モバイル端末検出
+const isMobileDevice = () => {
+    return (
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+        (window.innerWidth <= 768) ||
+        ('ontouchstart' in window) ||
+        (navigator.maxTouchPoints > 0)
+    );
+};
+
 // --- Utility Functions ---
 const insertAtCursor = (text) => {
     const textarea = elements.input;
@@ -130,7 +144,11 @@ const insertAtCursor = (text) => {
     const newCursorPos = start + text.length;
     textarea.selectionStart = textarea.selectionEnd = newCursorPos;
     if (window.innerWidth <= 768) showTextSection();
-    textarea.focus();
+    
+    // 自動フォーカスを設定から制御
+    if (CONFIG.behavior.autoFocus) {
+        textarea.focus();
+    }
 };
 
 const showTextSection = () => {
@@ -167,6 +185,7 @@ resetDrawState = (keepActive = false) => {
     drawState.detectedDots.clear();
     drawState.totalValue = 0;
     drawState.currentStrokeDetected = false;
+    drawState.hasMoved = false;
     if (!keepActive) drawState.lastStrokeTime = 0;
     clearTimeout(drawState.strokeTimer);
     drawState.strokeTimer = null;
@@ -281,7 +300,7 @@ const handleDeleteAction = (deleteToken = false) => {
         ta.selectionStart = ta.selectionEnd = before.length;
     }
     showTextSection();
-    if (ta) ta.focus();
+    if (CONFIG.behavior.autoFocus && ta) ta.focus();
 };
 
 const handleSpecialButtonClick = (e, type, actions) => {
@@ -369,6 +388,7 @@ const handlePointerDown = (e, el) => {
     drawState.currentTouchId = e.pointerId;
     drawState.pointerStartX = e.clientX;
     drawState.pointerStartY = e.clientY;
+    drawState.hasMoved = false;
     
     // ポインタキャプチャを試みる
     try { 
@@ -408,16 +428,30 @@ const handlePointerDown = (e, el) => {
 const handlePointerMove = (e) => {
     if (e.pointerId !== drawState.currentTouchId) return;
     
+    // モバイル端末では、より小さな動きでも移動と認識
+    const minDistance = isMobileDevice() ? 3 : CONFIG.sensitivity.minSwipeDistance;
+    
     const dx = e.clientX - drawState.pointerStartX;
     const dy = e.clientY - drawState.pointerStartY;
+    const distance = Math.hypot(dx, dy);
     
-    // 移動検出時、描画中なら検出を継続
-    if (Math.hypot(dx, dy) >= CONFIG.sensitivity.minSwipeDistance && drawState.isActive) {
+    // 移動検出時
+    if (distance >= minDistance) {
+        drawState.hasMoved = true;
+        
         // 移動を検出したらダブルタップの可能性をクリア
         tapState.lastTapTime = 0;
         tapState.lastTapElement = null;
         
-        detectDot(e.clientX, e.clientY);
+        // 描画中なら検出を継続
+        if (drawState.isActive) {
+            detectDot(e.clientX, e.clientY);
+            
+            // デバッグログ - モバイル環境でのなぞり書き追跡
+            if (isMobileDevice() && CONFIG.debug) {
+                debugLog(`移動検出: dx=${dx.toFixed(1)}, dy=${dy.toFixed(1)}, dist=${distance.toFixed(1)}`);
+            }
+        }
     }
 };
 
@@ -436,8 +470,8 @@ const handlePointerUp = (e) => {
         }
     }
     
-    // 描画終了処理
-    if (drawState.isActive) {
+    // 描画終了処理 - 移動が検出された場合のみ
+    if (drawState.isActive && drawState.hasMoved) {
         endDrawing();
     }
     
@@ -644,12 +678,6 @@ function initKeypad() {
     elements.specialRow.appendChild(spaceBtn);
 
     if (elements.d2dArea) elements.d2dArea.tabIndex = -1;
-
-    if (elements.input) {
-        elements.input.addEventListener('focus', e => {
-            if (!e.isTrusted && elements.d2dArea) elements.d2dArea.focus();
-        });
-    }
 
     updateConfigStyles();
     resizeCanvas();
