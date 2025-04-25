@@ -136,7 +136,7 @@ const isMobileDevice = () => {
 const insertAtCursor = (text) => {
     const textarea = elements.input;
     if (!textarea) return;
-
+    
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const textBefore = textarea.value.substring(0, start);
@@ -144,13 +144,13 @@ const insertAtCursor = (text) => {
     textarea.value = textBefore + text + textAfter;
     const newCursorPos = start + text.length;
     textarea.selectionStart = textarea.selectionEnd = newCursorPos;
-
-    // キャレットフォーカスなしで視覚的フィードバック
-    showRecognitionFeedback(text);
-
     if (window.innerWidth <= 768) showTextSection();
+    
+    // 自動フォーカスを設定から制御
+    if (CONFIG.behavior.autoFocus) {
+        textarea.focus();
+    }
 };
-
 
 const showTextSection = () => {
     if (window.innerWidth <= 768 && elements.outputSection && elements.textSection) {
@@ -290,23 +290,39 @@ const startDrawing = (dotEl, x, y) => {
 const handleDeleteAction = (deleteToken = false) => {
     const ta = elements.input;
     if (!ta) return;
-    
+
     const pos = ta.selectionStart;
     if (pos > 0) {
         let before = ta.value.substring(0, pos);
         const after = ta.value.substring(pos);
+
         if (deleteToken) {
-            const idx = before.lastIndexOf(' ');
-            before = idx >= 0 ? before.substring(0, idx + 1) : '';
+            // 改行 or 空白を含めて削除（直前の改行が優先）
+            const lastNewline = before.lastIndexOf('\n');
+            const lastSpace = before.lastIndexOf(' ');
+
+            let cutoff = 0;
+            if (lastNewline !== -1 && lastNewline > lastSpace) {
+                cutoff = lastNewline;
+            } else if (lastSpace !== -1) {
+                cutoff = lastSpace;
+            }
+
+            before = before.slice(0, cutoff);
         } else {
-            before = before.substring(0, before.length - 1);
+            // 単純に1文字削除
+            before = before.slice(0, -1);
         }
+
         ta.value = before + after;
         ta.selectionStart = ta.selectionEnd = before.length;
     }
+
     showTextSection();
     if (CONFIG.behavior.autoFocus && ta) ta.focus();
 };
+
+
 
 const handleSpecialButtonClick = (e, type, actions) => {
     if (e && e.preventDefault) e.preventDefault();
