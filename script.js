@@ -525,15 +525,11 @@ const setupSpecialButtonListeners = () => {
     const spaceBtn = elements.specialRow ? elements.specialRow.querySelector('[data-action="space"]') : null;
 
     if (deleteBtn) {
-        deleteBtn.addEventListener('pointerdown', e => {
-            if (e && e.preventDefault) e.preventDefault();
-        });
-        
-        deleteBtn.addEventListener('click', e => handleSpecialButtonClick(e, 'delete', {
-            single: () => handleDeleteAction(false),
-            double: () => handleDeleteAction(true)
-        }));
-    }
+    deleteBtn.addEventListener('pointerup', e => handleSpecialButtonClick(e, 'delete', {
+        single: () => handleDeleteAction(false),
+        double: () => handleDeleteAction(true)
+    }));
+}
 
     if (zeroBtn) {
         // 0 ボタンはdot-gridの数字と同じ扱い
@@ -541,15 +537,11 @@ const setupSpecialButtonListeners = () => {
     }
 
     if (spaceBtn) {
-        spaceBtn.addEventListener('pointerdown', e => {
-            if (e && e.preventDefault) e.preventDefault();
-        });
-        
-        spaceBtn.addEventListener('click', e => handleSpecialButtonClick(e, 'space', {
-            single: () => insertAtCursor(' '),
-            double: () => insertAtCursor('\n')
-        }));
-    }
+    spaceBtn.addEventListener('pointerup', e => handleSpecialButtonClick(e, 'space', {
+        single: () => insertAtCursor(' '),
+        double: () => insertAtCursor('\n')
+    }));
+}
 };
 
 const setupExecuteButtonListener = () => {
