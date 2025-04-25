@@ -422,38 +422,32 @@ const handlePointerDown = (e, el) => {
 
     showTextSection();
 
-    const now = Date.now();
     const isDot = el.classList.contains('dot') && el.closest('#dot-grid');
     const isSpecialButton = el.classList.contains('special-button');
+    const now = Date.now();
 
-    // === ダブルタップ検出 ===
-    if (tapState.lastTapElement === el && 
-        now - tapState.lastTapTime < tapState.doubleTapDelay) {
-
-        debugLog("[D2D] ダブルタップ検出");
-        // ---- ダブルタップ処理の前に drawState をクリア ----
-        resetDrawState(false);
-        clearCanvas();
-
-        handleDoubleTap(el);
-
-        tapState.lastTapTime = 0;
-        tapState.lastTapElement = null;
-        return;
-    }
-
-    // シングルタップ記録
-    tapState.lastTapTime = now;
-    tapState.lastTapElement = el;
-
-    // 丸型ドットの場合のみ描画開始
+    // --- 修正ポイント：シングルタップで文字入力 ---
     if (isDot && !isSpecialButton) {
-        debugLog("[D2D] トレース開始 (pointerdown)");
+        const digit = el.dataset.digit;
+        const word = el.dataset.word;
+
+        if (digit || word) {
+            insertAtCursor(digit || word);
+            el.classList.add('double-tapped'); // ビジュアル効果はそのまま活用
+            setTimeout(() => el.classList.remove('double-tapped'), 200);
+            debugLog(`[D2D] ドットから文字入力: ${digit || word}`);
+            return; // なぞり書き開始はスキップ
+        }
+
+        // なぞり書き開始条件（dot だけど digit/word 無し＝アルファベット用）
         startDrawing(el, e.clientX, e.clientY);
+        debugLog(`[D2D] トレース開始: index=${el.dataset.index}`);
     } else {
-        debugLog("[D2D] pointerdown on 非ドット");
+        // その他（special-button など）
+        debugLog(`[D2D] pointerdown on 非ドット`);
     }
 };
+
 
 
 
