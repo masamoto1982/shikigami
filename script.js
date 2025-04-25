@@ -387,17 +387,14 @@ const handleDoubleTap = (el) => {
 
 // ポインタイベント処理の改善
 const handlePointerDown = (e, el) => {
-    // イベントが無効な場合は早期リターン
     if (!e || !el) return;
     if (e.preventDefault) e.preventDefault();
-    
-    // ポインタID記録
+
     drawState.currentTouchId = e.pointerId;
     drawState.pointerStartX = e.clientX;
     drawState.pointerStartY = e.clientY;
     drawState.hasMoved = false;
-    
-    // ポインタキャプチャを試みる - モバイルでより重要
+
     try { 
         if (el && !el.hasPointerCapture(e.pointerId)) {
             el.setPointerCapture(e.pointerId);
@@ -408,28 +405,31 @@ const handlePointerDown = (e, el) => {
     }
 
     showTextSection();
-    
-    // ダブルタップ検出
+
     const now = Date.now();
+
+    const isDot = el.classList.contains('dot') && el.closest('#dot-grid');
+    const isSpecialButton = el.classList.contains('special-button');
+
+    // ダブルタップ検出（共通）
     if (tapState.lastTapElement === el && 
         now - tapState.lastTapTime < tapState.doubleTapDelay) {
-        // ダブルタップを検出
         handleDoubleTap(el);
-        
-        // ダブルタップ検出後は状態をリセット
         tapState.lastTapTime = 0;
         tapState.lastTapElement = null;
-    } else {
-        // シングルタップを記録
-        tapState.lastTapTime = now;
-        tapState.lastTapElement = el;
-        
-        // dot-grid内のドットの場合は描画の準備を開始
-        if (el.closest('#dot-grid')) {
-            startDrawing(el, e.clientX, e.clientY);
-        }
+        return; // ダブルタップ時は以降の処理をスキップ
+    }
+
+    // 初回タップ記録
+    tapState.lastTapTime = now;
+    tapState.lastTapElement = el;
+
+    // dot（円形）の場合のみ、なぞり書きを開始
+    if (isDot && !isSpecialButton) {
+        startDrawing(el, e.clientX, e.clientY);
     }
 };
+
 
 const handlePointerMove = (e) => {
     // イベントが無効または別のポインタIDの場合は無視
