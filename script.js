@@ -779,7 +779,7 @@ const updateConfigStyles = () => {
              -webkit-user-select: none;
              -ms-user-select: none;
              touch-action: manipulation; /* Allow tap, disable zoom etc */
-             flex-grow: 1; /* Allow buttons to grow */
+             //flex-grow: 1;
              text-align: center;
              border: 1px solid #9ca3af;
         }
@@ -788,7 +788,7 @@ const updateConfigStyles = () => {
          }
         #special-row { /* Layout for special buttons */
             display: flex;
-            justify-content: space-around; /* Space out buttons */
+            justify-content: center; /* Space out buttons */
             gap: ${CONFIG.layout.dotGap}px;
              margin-top: ${CONFIG.layout.dotGap}px; /* Add space above */
         }
