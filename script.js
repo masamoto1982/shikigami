@@ -5,6 +5,8 @@ const CONFIG = {
         hitRadius: 22,
         minSwipeDistance: 5, // モバイルでは小さな値にする必要がある
         debounceTime: 50,
+		tapMaxDistance: 1, // タップと判定する最大移動距離
+        tapMaxDuration: 100 // タップと判定する最大時間
     },
     timing: {
         multiStrokeTimeout: 700,
@@ -402,6 +404,7 @@ const handleDoubleTap = (el) => {
 };
 
 // ポインタイベント処理の改善
+// script.jsのhandlePointerDown関数を以下のように修正
 const handlePointerDown = (e, el) => {
     if (!e || !el) return;
     if (e.preventDefault) e.preventDefault();
@@ -424,68 +427,57 @@ const handlePointerDown = (e, el) => {
 
     const isDot = el.classList.contains('dot') && el.closest('#dot-grid');
     const isSpecialButton = el.classList.contains('special-button');
-    const now = Date.now();
 
-    // --- 修正ポイント：シングルタップで文字入力 ---
-    if (isDot && !isSpecialButton) {
-        const digit = el.dataset.digit;
-        const word = el.dataset.word;
-
-        if (digit || word) {
-            insertAtCursor(digit || word);
-            el.classList.add('double-tapped'); // ビジュアル効果はそのまま活用
-            setTimeout(() => el.classList.remove('double-tapped'), 200);
-            debugLog(`[D2D] ドットから文字入力: ${digit || word}`);
-            return; // なぞり書き開始はスキップ
+    // タップ判定用のタイマーを設定
+    drawState.tapCheckTimer = setTimeout(() => {
+        if (!drawState.hasMoved) {
+            const digit = el.dataset.digit;
+            const word = el.dataset.word;
+            
+            if (digit || word) {
+                insertAtCursor(digit || word);
+                el.classList.add('double-tapped');
+                setTimeout(() => el.classList.remove('double-tapped'), 200);
+                debugLog(`[D2D] タップ入力: ${digit || word}`);
+                resetDrawState();
+            }
         }
+    }, 200); // タップ判定時間を200msに設定
 
-        // なぞり書き開始条件（dot だけど digit/word 無し＝アルファベット用）
+    // ナゾリ書き開始判定
+    if (isDot && !isSpecialButton) {
         startDrawing(el, e.clientX, e.clientY);
         debugLog(`[D2D] トレース開始: index=${el.dataset.index}`);
-    } else {
-        // その他（special-button など）
-        debugLog(`[D2D] pointerdown on 非ドット`);
     }
 };
 
 
 
 
+// handlePointerMove関数に移動判定を追加
 const handlePointerMove = (e) => {
-    // イベントが無効または別のポインタIDの場合は無視
     if (!e || e.pointerId !== drawState.currentTouchId) return;
-    
-    // モバイル端末では、より小さな動きでも移動と認識
-    const minDistance = isMobileDevice() ? 3 : CONFIG.sensitivity.minSwipeDistance;
     
     const dx = e.clientX - drawState.pointerStartX;
     const dy = e.clientY - drawState.pointerStartY;
     const distance = Math.hypot(dx, dy);
     
-    // 移動検出時
-    if (distance >= minDistance) {
+    // 移動検出時（タップ判定をキャンセル）
+    if (distance >= CONFIG.sensitivity.minSwipeDistance) {
         drawState.hasMoved = true;
+        clearTimeout(drawState.tapCheckTimer);
         
-        // 移動を検出したらダブルタップの可能性をクリア
-        tapState.lastTapTime = 0;
-        tapState.lastTapElement = null;
-        
-        // 描画中なら検出を継続
         if (drawState.isActive && drawState.isDrawingMode) {
             detectDot(e.clientX, e.clientY);
-            
-            // デバッグログ - モバイル環境でのなぞり書き追跡
-            if (isMobileDevice() && CONFIG.debug) {
-                debugLog(`移動検出: dx=${dx.toFixed(1)}, dy=${dy.toFixed(1)}, dist=${distance.toFixed(1)}`);
-            }
         }
     }
 };
 
 const handlePointerUp = (e) => {
-    // イベントが無効または別のポインタIDの場合は無視
     if (!e || e.pointerId !== drawState.currentTouchId) return;
     if (e.preventDefault) e.preventDefault();
+    
+    clearTimeout(drawState.tapCheckTimer); // タイマーをクリア
     
     // ポインタキャプチャ解放
     try {
