@@ -395,40 +395,50 @@ const handlePointerDown = (e, el) => {
     drawState.pointerStartY = e.clientY;
     drawState.hasMoved = false;
 
-    try { 
+    try {
         if (el && !el.hasPointerCapture(e.pointerId)) {
             el.setPointerCapture(e.pointerId);
             el.dataset.pointerId = e.pointerId;
-        } 
-    } catch (err) { 
+        }
+    } catch (err) {
         console.log("Pointer capture not supported or failed:", err);
     }
 
     showTextSection();
 
     const now = Date.now();
-
     const isDot = el.classList.contains('dot') && el.closest('#dot-grid');
     const isSpecialButton = el.classList.contains('special-button');
 
-    // ダブルタップ検出（共通）
+    // === ダブルタップ検出 ===
     if (tapState.lastTapElement === el && 
         now - tapState.lastTapTime < tapState.doubleTapDelay) {
+
+        debugLog("[D2D] ダブルタップ検出");
+        // ---- ダブルタップ処理の前に drawState をクリア ----
+        resetDrawState(false);
+        clearCanvas();
+
         handleDoubleTap(el);
+
         tapState.lastTapTime = 0;
         tapState.lastTapElement = null;
-        return; // ダブルタップ時は以降の処理をスキップ
+        return;
     }
 
-    // 初回タップ記録
+    // シングルタップ記録
     tapState.lastTapTime = now;
     tapState.lastTapElement = el;
 
-    // dot（円形）の場合のみ、なぞり書きを開始
+    // 丸型ドットの場合のみ描画開始
     if (isDot && !isSpecialButton) {
+        debugLog("[D2D] トレース開始 (pointerdown)");
         startDrawing(el, e.clientX, e.clientY);
+    } else {
+        debugLog("[D2D] pointerdown on 非ドット");
     }
 };
+
 
 
 const handlePointerMove = (e) => {
