@@ -136,7 +136,7 @@ const isMobileDevice = () => {
 const insertAtCursor = (text) => {
     const textarea = elements.input;
     if (!textarea) return;
-    
+
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const textBefore = textarea.value.substring(0, start);
@@ -144,13 +144,13 @@ const insertAtCursor = (text) => {
     textarea.value = textBefore + text + textAfter;
     const newCursorPos = start + text.length;
     textarea.selectionStart = textarea.selectionEnd = newCursorPos;
+
+    // キャレットフォーカスなしで視覚的フィードバック
+    showRecognitionFeedback(text);
+
     if (window.innerWidth <= 768) showTextSection();
-    
-    // 自動フォーカスを設定から制御
-    if (CONFIG.behavior.autoFocus) {
-        textarea.focus();
-    }
 };
+
 
 const showTextSection = () => {
     if (window.innerWidth <= 768 && elements.outputSection && elements.textSection) {
