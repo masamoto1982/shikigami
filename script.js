@@ -1,16 +1,13 @@
 // --- Configuration Parameters ---
 const CONFIG = {
-    // Removed debug flag
     sensitivity: {
         hitRadius: 22,
         minSwipeDistance: 5, // モバイルでは小さな値にする必要がある
         debounceTime: 50
-        // Removed tapMaxDistance, tapMaxDuration
     },
     timing: {
         multiStrokeTimeout: 700,
         doubleTapDelay: 300
-        // Removed strokeCooldown
     },
     layout: {
         dotSize: 45,
@@ -19,7 +16,6 @@ const CONFIG = {
         gridCols: 5
     },
     visual: {
-        // Removed lineWidth, lineColor
         detectedColor: '#fca5a5',
         // 認識フィードバックのサイズ
         feedbackSize: 120,
@@ -28,7 +24,6 @@ const CONFIG = {
     behavior: {
         autoFocus: false, // 自動フォーカスを無効化
     },
-    // ★★★ 新規追加: 認識設定 ★★★
     recognition: {
         tolerance: 1 // 許容するビット差 (1 = ドット1つ分の違いを許容)
     }
@@ -119,7 +114,6 @@ const keyState = {
 
 // モバイル端末検出
 const isMobileDevice = () => {
-    // Simplified check
     return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || /Mobi|Android/i.test(navigator.userAgent);
 };
 
@@ -141,11 +135,9 @@ const insertAtCursor = (text) => {
 };
 
 const showTextSection = () => {
-    // ★★★ モバイル判定と要素存在チェックを追加 ★★★
     if (isMobileDevice() && elements.textSection && elements.outputSection) {
         elements.outputSection.classList.add('hide'); // 必ずoutputを隠す
         elements.textSection.classList.remove('hide');
-        // console.log("Show Text Section (Mobile)"); // デバッグ用ログ
     }
 };
 
@@ -171,7 +163,6 @@ const clearCanvas = () => {
 // --- Gesture Logic Functions ---
 const resetDrawState = (keepActive = false) => {
     drawState.isActive = keepActive;
-    // Only remove 'detected' class if dots exist
     if (drawState.detectedDots.size > 0) {
         drawState.detectedDots.forEach(dot => dot.classList.remove('detected'));
         drawState.detectedDots.clear();
@@ -238,11 +229,8 @@ const showRecognitionFeedback = (character) => {
 const endDrawing = () => {
     if (!drawState.isActive) return;
     const now = Date.now();
-    // Don't update lastStrokeTime immediately, wait for timeout or recognition
-    // drawState.lastStrokeTime = now;
 
     if (drawState.currentStrokeDetected) {
-        // Clear existing timer before setting a new one
         clearTimeout(drawState.strokeTimer);
 
         drawState.strokeTimer = setTimeout(() => {
@@ -252,26 +240,21 @@ const endDrawing = () => {
                     insertAtCursor(rec);
                     showRecognitionFeedback(rec);
                 }
-                // Reset after recognition attempt, regardless of success
                 resetDrawState();
                 clearCanvas();
-                drawState.lastStrokeTime = 0; // Reset last stroke time after final processing
+                drawState.lastStrokeTime = 0;
             } else {
-                 // If no dots were detected, just reset state without recognition
                  resetDrawState();
                  clearCanvas();
                  drawState.lastStrokeTime = 0;
             }
-            drawState.strokeTimer = null; // Clear timer reference
+            drawState.strokeTimer = null;
         }, CONFIG.timing.multiStrokeTimeout);
     } else if (!drawState.strokeTimer) {
-        // If drawing ended without detecting dots (e.g., quick tap on empty space)
-        // and no timer is running, reset immediately.
          resetDrawState();
          clearCanvas();
          drawState.lastStrokeTime = 0;
     }
-     // Update last stroke time potentially used by startDrawing check
      drawState.lastStrokeTime = now;
 };
 
@@ -284,9 +267,7 @@ const addDetectedDot = (dot) => {
     const v = parseInt(dot.dataset.value, 10);
     if (!isNaN(v)) {
         drawState.totalValue += v;
-        // console.log(`ドット検出: index=${dot.dataset.index}, value=${v}, total=${drawState.totalValue}`); // Log removed/commented
     }
-    // Clear the multi-stroke timeout timer whenever a new dot is added to the current stroke
     clearTimeout(drawState.strokeTimer);
     drawState.strokeTimer = null;
 };
@@ -297,11 +278,7 @@ const detectDot = (x, y) => {
     if (now - drawState.lastDetectionTime < CONFIG.sensitivity.debounceTime) return;
     drawState.lastDetectionTime = now;
 
-    // gridRect seems unused
-    // const gridRect = elements.dotGrid.getBoundingClientRect();
-
     const hitRadius = CONFIG.sensitivity.hitRadius;
-    // Query all dots including special row (numeric 0)
     elements.d2dArea.querySelectorAll('.dot').forEach(dot => {
         if (drawState.detectedDots.has(dot)) return;
         const r = dot.getBoundingClientRect();
@@ -311,40 +288,34 @@ const detectDot = (x, y) => {
 
         if (dist <= hitRadius) {
             addDetectedDot(dot);
-            // If a dot is detected, reset the endDrawing timer
-            // to allow continuation of the stroke
             clearTimeout(drawState.strokeTimer);
             drawState.strokeTimer = null;
-             // Update last stroke time to keep the stroke active
              drawState.lastStrokeTime = Date.now();
         }
     });
 };
 
 const startDrawing = (dotEl, x, y) => {
-    // Check if the element is actually a grid dot or the special zero dot
     const isGridDot = dotEl.closest('#dot-grid');
     const isZeroDot = dotEl.closest('#special-row') && dotEl.dataset.digit === '0';
     if (!dotEl || !dotEl.classList.contains('dot') || (!isGridDot && !isZeroDot)) return;
 
     const now = Date.now();
-    // Reset if starting a new stroke after timeout
     if (!drawState.isActive || now - drawState.lastStrokeTime > CONFIG.timing.multiStrokeTimeout) {
-        resetDrawState(true); // Keep active for the new stroke
+        resetDrawState(true);
     }
     drawState.isActive = true;
-    drawState.isDrawingMode = true; // Enable drawing mode
+    drawState.isDrawingMode = true;
     drawState.startX = x;
     drawState.startY = y;
     drawState.lastDetectionTime = now;
-    drawState.lastStrokeTime = now; // Mark the start time of this stroke part
+    drawState.lastStrokeTime = now;
 
-    addDetectedDot(dotEl); // Detect the starting dot
+    addDetectedDot(dotEl);
 
-    // Clear any pending endDrawing timer from a previous quick stroke
+    
     clearTimeout(drawState.strokeTimer);
     drawState.strokeTimer = null;
-    // console.log("なぞり書き開始"); // Log removed/commented
 };
 
 // --- Event Handlers ---
@@ -359,31 +330,29 @@ const handleDeleteAction = (deleteToken = false) => {
             const lastNewline = before.lastIndexOf('\n');
             const lastSpace = before.lastIndexOf(' ');
             let cutoff = Math.max(lastNewline, lastSpace);
-            if (cutoff === -1) { // No space or newline found
+            if (cutoff === -1) {
                  cutoff = 0;
             } else if (lastNewline !== -1 && lastNewline === pos -1) {
-                 // If cursor is right after a newline, delete the newline
                  cutoff = lastNewline;
             } else if (lastSpace !== -1 && lastSpace === pos - 1 && !/\s/.test(before.charAt(pos-2))) {
-                 // If cursor is right after a space, delete up to before the space
                  cutoff = lastSpace;
             } else if (lastNewline > lastSpace) {
-                 cutoff = lastNewline + 1; // Keep the newline char itself
+                 cutoff = lastNewline + 1;
             } else if (lastSpace > lastNewline) {
-                 cutoff = lastSpace + 1; // Keep the space char itself
+                 cutoff = lastSpace + 1;
             } else {
-                 cutoff = 0; // Delete everything if only spaces/newlines before
+                 cutoff = 0;
             }
-            // Handle edge case: only spaces/newlines before cursor
+            
             if (before.trim() === '') cutoff = 0;
 
             before = before.slice(0, cutoff);
 
         } else {
-            before = before.slice(0, -1); // Simple backspace
+            before = before.slice(0, -1);
         }
         ta.value = before + after;
-        ta.selectionStart = ta.selectionEnd = before.length; // Set cursor position
+        ta.selectionStart = ta.selectionEnd = before.length;
     }
     if (isMobileDevice()) showTextSection();
     if (CONFIG.behavior.autoFocus) ta.focus();
@@ -404,13 +373,11 @@ const handleSpecialButtonClick = (e, type, actions) => {
         specialButtonState.clickCount = 1;
         specialButtonState.lastClickTime = now;
         specialButtonState.clickTarget = type;
-        // Clear previous timer if any
         clearTimeout(specialButtonState.clickTimer);
         specialButtonState.clickTimer = setTimeout(() => {
             if (specialButtonState.clickCount === 1 && specialButtonState.clickTarget === type) {
                 if (actions.single) actions.single();
             }
-            // Reset state after timeout regardless
             specialButtonState.clickCount = 0;
             specialButtonState.clickTarget = null;
             specialButtonState.clickTimer = null;
@@ -431,7 +398,6 @@ const executeCode = () => {
         // ★★★ 実行後に output を表示 ★★★
         showOutputSection(); // 実行結果を表示する関数を呼ぶ
         if (!String(result).startsWith("エラー:") && elements.input) {
-             // elements.input.value = ""; // Optionally clear input
         }
     } catch (err) {
         if (elements.output) {
@@ -444,11 +410,11 @@ const executeCode = () => {
 
 const setupKeyboardHandlers = () => {
     document.addEventListener('keydown', (e) => {
-        if (e.target === elements.input || e.target === elements.output) return; // Ignore if typing in text areas
+        if (e.target === elements.input || e.target === elements.output) return;
 
         if (e.key === 'Delete' || e.key === 'Backspace') {
-            e.preventDefault(); // Prevent browser back navigation
-            handleDeleteAction(e.ctrlKey || e.metaKey); // Ctrl/Cmd + Backspace for token delete
+            e.preventDefault();
+            handleDeleteAction(e.ctrlKey || e.metaKey);
         }
         if (e.key === ' ' || e.key === 'Spacebar') {
             e.preventDefault();
@@ -456,22 +422,17 @@ const setupKeyboardHandlers = () => {
         }
          if (e.key === 'Enter') {
              e.preventDefault();
-             if(e.shiftKey) { // Shift+Enter for execution? Or just newline?
+             if(e.shiftKey) {
                  executeCode();
              } else {
                  insertAtCursor('\n');
              }
          }
     });
-    // keyup is not strictly needed anymore with this simplified logic
 };
 
-// handleDoubleTap function seems redundant with handlePointerDown logic, removing.
-
-// Pointer Event Handlers (incorporating tap/swipe logic)
 const handlePointerDown = (e, el) => {
     if (!e || !el) return;
-    // Allow default behavior for text input elements if focus is needed
     if (e.target !== elements.input && e.target !== elements.output) {
         if (e.preventDefault) e.preventDefault();
     }
@@ -481,75 +442,62 @@ const handlePointerDown = (e, el) => {
     drawState.pointerStartX = e.clientX;
     drawState.pointerStartY = e.clientY;
     drawState.hasMoved = false;
-    // isDrawingMode will be set true only if movement occurs or on dot elements
 
-    // Capture pointer on the element itself to track movement reliably
+
     try {
         if (el.setPointerCapture && !el.hasPointerCapture(e.pointerId)) {
             el.setPointerCapture(e.pointerId);
-            // Store captured element reference if needed, or rely on event target?
-            // For simplicity, we assume events bubble correctly or use document listeners.
         }
     } catch (err) {
         console.log("Pointer capture not supported or failed:", err);
     }
 
-     if (isMobileDevice()) showTextSection(); // Show input area on interaction
+     if (isMobileDevice()) showTextSection();
 
-    const isDot = el.classList.contains('dot'); // Includes grid dots and zero dot
-    const isSpecialButton = el.classList.contains('special-button') && !isDot; // DELETE, SPACE
+    const isDot = el.classList.contains('dot');
+    const isSpecialButton = el.classList.contains('special-button') && !isDot;
 
-    // --- Tap vs. Swipe Logic ---
-    // 1. Set a timer to detect a potential tap action.
-    clearTimeout(drawState.tapCheckTimer); // Clear previous timer
+   
+    clearTimeout(drawState.tapCheckTimer);
     drawState.tapCheckTimer = setTimeout(() => {
-        // If timer fires and pointer hasn't moved significantly
         if (!drawState.hasMoved) {
-            const digit = el.dataset.digit; // Works for grid numbers and zero
+            const digit = el.dataset.digit;
             const word = el.dataset.word;
 
-            if (digit || word) { // Is it a dot with direct input action?
+            if (digit || word) {
                 insertAtCursor(digit || word);
-                el.classList.add('tapped-feedback'); // Use a generic tap class
+                el.classList.add('tapped-feedback');
                 setTimeout(() => el.classList.remove('tapped-feedback'), 200);
-                resetDrawState(); // Reset drawing state after tap input
+                resetDrawState();
                 clearCanvas();
             } else if (isDot) {
-                 // If it's a placeholder dot, maybe do nothing on tap?
-                 // Or potentially start drawing if held? Current logic handles this via movement.
-                 // For now, tap on placeholder does nothing unless drag starts.
-                 resetDrawState(); // Ensure tap doesn't leave lingering state
+                 resetDrawState();
                  clearCanvas();
             }
-             // Special buttons (DELETE/SPACE) handled by pointerup/click logic, not tap timer.
         }
-        drawState.tapCheckTimer = null; // Timer finished
-    }, 200); // Tap timeout duration
+        drawState.tapCheckTimer = null;
+    }, 200);
 
-    // 2. If it's a dot (grid or zero), potentially start drawing state immediately
-    //    but only activate drawing mode (`isDrawingMode`) on actual movement.
+
     if (isDot) {
          const now = Date.now();
-         // Reset if starting a new stroke after timeout
          if (!drawState.isActive || now - drawState.lastStrokeTime > CONFIG.timing.multiStrokeTimeout) {
-             resetDrawState(true); // Keep active for the new stroke
+             resetDrawState(true);
          }
          drawState.isActive = true;
-         // drawState.isDrawingMode = false; // Set to true only on move
          drawState.startX = e.clientX;
          drawState.startY = e.clientY;
          drawState.lastDetectionTime = now;
          drawState.lastStrokeTime = now;
 
-         // Add starting dot immediately ONLY if we decide tap doesn't cancel it
-         // Let's add it, but movement check will determine if it becomes a stroke
+         
          addDetectedDot(el);
 
-         // Clear any pending endDrawing timer from a previous quick stroke
+         
          clearTimeout(drawState.strokeTimer);
          drawState.strokeTimer = null;
     } else {
-        // If not a dot, ensure drawing state is not active
+       
         resetDrawState();
         clearCanvas();
     }
@@ -557,7 +505,7 @@ const handlePointerDown = (e, el) => {
 
 
 const handlePointerMove = (e) => {
-    // Only process if a pointer is down and it's the primary one we track
+    
     if (!drawState.isActive || e.pointerId !== drawState.currentTouchId) return;
 
     const dx = e.clientX - drawState.pointerStartX;
@@ -565,19 +513,18 @@ const handlePointerMove = (e) => {
     const distance = Math.hypot(dx, dy);
 
     if (distance >= CONFIG.sensitivity.minSwipeDistance) {
-        // First significant move detected
+        
         if (!drawState.hasMoved) {
             drawState.hasMoved = true;
-            clearTimeout(drawState.tapCheckTimer); // Cancel tap timer
+            clearTimeout(drawState.tapCheckTimer);
             drawState.tapCheckTimer = null;
-            // NOW set drawing mode true if pointer started on a dot
             const startElement = document.elementFromPoint(drawState.pointerStartX, drawState.pointerStartY);
              if (startElement && startElement.classList.contains('dot')) {
                  drawState.isDrawingMode = true;
             }
         }
 
-        // If in drawing mode, detect dots
+        
         if (drawState.isDrawingMode) {
             detectDot(e.clientX, e.clientY);
         }
@@ -587,9 +534,9 @@ const handlePointerMove = (e) => {
 const handlePointerUp = (e) => {
     if (e.pointerId !== drawState.currentTouchId) return; // Only handle the tracked pointer
 
-    // Release pointer capture if held
+    
     try {
-        const el = e.target; // Use event target for release
+        const el = e.target;
         if (el && el.releasePointerCapture && el.hasPointerCapture(e.pointerId)) {
             el.releasePointerCapture(e.pointerId);
         }
@@ -597,12 +544,11 @@ const handlePointerUp = (e) => {
         console.log("Error releasing pointer capture:", err);
     }
 
-    // If a tap timer was running, clear it (means pointer up happened before timeout)
+    
     if (drawState.tapCheckTimer) {
         clearTimeout(drawState.tapCheckTimer);
         drawState.tapCheckTimer = null;
-        // If it was a quick tap on a non-action dot, reset.
-        // Action dots (numbers/words) handle reset in their tap logic.
+        
          const el = e.target;
          if (el && el.classList.contains('dot') && !el.dataset.digit && !el.dataset.word) {
               resetDrawState();
@@ -610,25 +556,22 @@ const handlePointerUp = (e) => {
          }
     }
 
-    // End drawing sequence if we were in drawing mode or stroke was detected
+   
     if (drawState.isActive && (drawState.isDrawingMode || drawState.currentStrokeDetected)) {
-        endDrawing(); // Let endDrawing handle timeout and recognition
+        endDrawing();
     } else {
-        // If pointer up occurs without significant movement or dot detection, ensure clean state
         resetDrawState();
         clearCanvas();
     }
 
-    // Reset interaction state
+    
     drawState.currentTouchId = null;
-    // isActive, isDrawingMode, hasMoved are reset by resetDrawState or endDrawing timeout
 };
 
 
 // マルチタッチサポートのためのイベントリスナー
 const setupMultiTouchSupport = () => {
     if (isMobileDevice() && elements.d2dArea) {
-        // Prevent default touch actions like scrolling/zooming on the input area
         elements.d2dArea.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
         elements.d2dArea.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
     }
@@ -636,13 +579,12 @@ const setupMultiTouchSupport = () => {
 
 // --- Event Listener Setup ---
 const setupDotEventListeners = () => {
-    // Add listener to the container and delegate based on target
     if (!elements.d2dArea) return;
     elements.d2dArea.addEventListener('pointerdown', (e) => {
         if (e.target.classList.contains('dot')) {
             handlePointerDown(e, e.target);
         }
-    }, { passive: false }); // Use container to capture events for all dots
+    }, { passive: false });
 };
 
 
@@ -650,13 +592,11 @@ const setupSpecialButtonListeners = () => {
     const deleteBtn = elements.specialRow ? elements.specialRow.querySelector('[data-action="delete"]') : null;
     const spaceBtn = elements.specialRow ? elements.specialRow.querySelector('[data-action="space"]') : null;
 
-    // Use pointerup for button-like actions to avoid conflict with potential drag
     if (deleteBtn) {
         deleteBtn.addEventListener('pointerup', e => handleSpecialButtonClick(e, 'delete', {
             single: () => handleDeleteAction(false),
             double: () => handleDeleteAction(true)
         }));
-        // Prevent pointerdown from starting drag/selection on button
         deleteBtn.addEventListener('pointerdown', e => e.preventDefault());
     }
 
@@ -686,26 +626,19 @@ const resizeCanvas = () => {
     const pt = parseFloat(style.paddingTop) || 0;
     const pb = parseFloat(style.paddingBottom) || 0;
 
-    // Adjust canvas size to fit within padding
+    
     canvas.width = d2dArea.clientWidth - pl - pr;
     canvas.height = d2dArea.clientHeight - pt - pb;
-    // Position canvas relative to padding
     canvas.style.left = `${pl}px`;
     canvas.style.top = `${pt}px`;
 
-    clearCanvas(); // Clear after resize
+    clearCanvas();
 };
 
 const setupGestureListeners = () => {
-    // Listen on document for move/up/cancel/leave to handle cases where
-    // the pointer leaves the original element or the d2dArea.
     document.addEventListener('pointermove', handlePointerMove, { passive: false });
     document.addEventListener('pointerup', handlePointerUp, { passive: false });
-    document.addEventListener('pointercancel', handlePointerUp, { passive: false }); // Treat cancel like up
-    // Optional: Add leave listener to d2dArea if needed
-    // if(elements.d2dArea) {
-    //     elements.d2dArea.addEventListener('pointerleave', handlePointerUp, { passive: false });
-    // }
+    document.addEventListener('pointercancel', handlePointerUp, { passive: false });
 };
 
 // --- Debug Helper ---
@@ -833,7 +766,7 @@ const dotValues = [
     65536, 131072, 262144, 524288, 1048576,
     2097152, 4194304, 8388608, 16777216
 ];
-const letterPatterns = { // Ensure keys are numbers
+const letterPatterns = {
     17836036: 'A', 28611899: 'B', 32539711: 'C', 1224985: 'D',
     32567296: 'E', 1113151: 'F', 33092671: 'G', 18415153: 'H',
     32641183: 'I', 7475359: 'J', 17990833: 'K', 32539681: 'L',
@@ -842,17 +775,16 @@ const letterPatterns = { // Ensure keys are numbers
     33080881: 'U', 4204561: 'V', 18732593: 'W', 18157905: 'X',
     4329809:  'Y', 32575775: 'Z'
 };
-const numericPositions = { // Key: index, Value: Displayed Digit
+const numericPositions = {
     0: '1', 2: '2', 4: '3',
     10: '4', 12: '5', 14: '6',
     20: '7', 22: '8', 24: '9'
 };
-const dotWordMapping = { // ★★★ Key: value, Value: Displayed Word ★★★
+const dotWordMapping = {
     32: '(', 64: ')', 128: '+', 256: '{', 512: '}',
     2048: '*', 8192: '/',
     131072: '-',
     2097152: '>', 8388608: '='
-    // Removed '未定' entries for clarity, add back if needed
 };
 
 
@@ -863,8 +795,8 @@ function initKeypad() {
         return;
     }
 
-    elements.dotGrid.innerHTML = ''; // Clear previous grid
-    elements.specialRow.innerHTML = ''; // Clear previous special row
+    elements.dotGrid.innerHTML = '';
+    elements.specialRow.innerHTML = '';
 
     // Grid Rows and Dots
     for (let r = 0; r < CONFIG.layout.gridRows; r++) {
@@ -880,20 +812,19 @@ function initKeypad() {
             dot.dataset.index = idx;
             dot.dataset.value = value;
 
-            const digit = numericPositions[idx]; // Lookup by index
-            const word = dotWordMapping[value]; // ★★★ Lookup by value ★★★
+            const digit = numericPositions[idx];
+            const word = dotWordMapping[value];
 
             if (digit) {
                 dot.classList.add('numeric');
                 dot.textContent = digit;
                 dot.dataset.digit = digit;
-            } else if (word) { // Check if word is defined in the mapping
+            } else if (word) {
                 dot.classList.add('word-dot');
                 dot.textContent = word;
                 dot.dataset.word = word;
             } else {
                 dot.classList.add('placeholder-dot');
-                // dot.textContent = '·'; // Optional placeholder visual
             }
             row.appendChild(dot);
         }
@@ -903,17 +834,17 @@ function initKeypad() {
     // Special Row Buttons
     const deleteBtn = document.createElement('div');
     deleteBtn.className = 'special-button delete';
-    deleteBtn.textContent = '削除'; // More user-friendly text
+    deleteBtn.textContent = '削除';
     deleteBtn.dataset.action = 'delete';
     deleteBtn.title = '削除 (ダブルタップで単語削除)';
     elements.specialRow.appendChild(deleteBtn);
 
     const zeroBtn = document.createElement('div');
-    zeroBtn.className = 'dot numeric'; // Style as a dot
+    zeroBtn.className = 'dot numeric';
     zeroBtn.textContent = '0';
     zeroBtn.dataset.digit = '0';
-    zeroBtn.dataset.index = 'special_0'; // Unique index
-    zeroBtn.dataset.value = '0'; // Assign value 0 if needed for patterns
+    zeroBtn.dataset.index = 'special_0';
+    zeroBtn.dataset.value = '0';
     elements.specialRow.appendChild(zeroBtn);
 
     const spaceBtn = document.createElement('div');
@@ -923,12 +854,11 @@ function initKeypad() {
     spaceBtn.title = '空白 (ダブルタップで改行)';
     elements.specialRow.appendChild(spaceBtn);
 
-    if (elements.d2dArea) elements.d2dArea.tabIndex = -1; // Prevent tabbing
+    if (elements.d2dArea) elements.d2dArea.tabIndex = -1;
 
-    updateConfigStyles(); // Apply dynamic styles
-    resizeCanvas(); // Initial canvas size
-
-    // Setup listeners after elements are in DOM
+    updateConfigStyles();
+    resizeCanvas();
+	
     setupDotEventListeners();
     setupSpecialButtonListeners();
     setupGestureListeners();
@@ -941,15 +871,7 @@ const initResponsiveLayout = () => {
         if (isMobileDevice()) {
             // ★★★ モバイル時はデフォルトでText Sectionを表示 ★★★
             if (elements.textSection && elements.outputSection) {
-                 // 原則としてText Sectionを表示状態にする
-                 // Outputが明示的に表示されるのは executeCode が呼ばれた時のみ
                  showTextSection();
-                 // ただし、Outputに実行結果が残っていてInputが空の場合のみOutputを優先する、という判断も可能
-                 // if (elements.output && elements.output.value !== '' && elements.input && elements.input.value === '') {
-                 //    showOutputSection();
-                 // } else {
-                 //    showTextSection();
-                 // }
             }
         } else {
             // デスクトップでは両方表示
@@ -959,13 +881,12 @@ const initResponsiveLayout = () => {
     };
     window.addEventListener('resize', checkLayout);
     window.addEventListener('orientationchange', checkLayout);
-    checkLayout(); // Initial check
+    checkLayout();
 };
 
 
 // --- Initialization on load ---
 window.addEventListener('DOMContentLoaded', () => {
-    // Ensure all elements are available before initializing
     initKeypad();
     initResponsiveLayout();
     setupExecuteButtonListener();
