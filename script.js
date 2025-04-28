@@ -1,17 +1,17 @@
 // --- Configuration Parameters ---
 const CONFIG = {
     sensitivity: {
-        hitRadius: 22,
+        hitRadius: 15,
         minSwipeDistance: 5, // モバイルでは小さな値にする必要がある
         debounceTime: 50
     },
     timing: {
-        multiStrokeTimeout: 700,
+        multiStrokeTimeout: 500,
         doubleTapDelay: 300
     },
     layout: {
-        dotSize: 45,
-        dotGap: 10,
+        dotSize: 40,
+        dotGap: 20,
         gridRows: 5,
         gridCols: 5
     },
