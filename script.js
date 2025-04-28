@@ -1,3 +1,183 @@
+// --- 分数計算をサポートするクラス ---
+class Fraction {
+    constructor(numerator, denominator = 1, isFractionOperation = false) {
+        if (denominator === 0) {
+            throw new Error("Division by zero");
+        }
+        
+        // 数値型として扱う
+        this.numerator = Number(numerator);
+        this.denominator = Number(denominator);
+        
+        // 分母が負の場合は分子・分母ともに符号を反転
+        if (this.denominator < 0) {
+            this.numerator = -this.numerator;
+            this.denominator = -this.denominator;
+        }
+        
+        // 明示的な分数演算の場合はフラグをセット
+        this.isFractionOperation = isFractionOperation;
+        
+        this.simplify();
+    }
+    
+    // 最大公約数を計算
+    static gcd(a, b) {
+        a = Math.abs(a);
+        b = Math.abs(b);
+        
+        // 小数の場合は整数に変換
+        if (!Number.isInteger(a) || !Number.isInteger(b)) {
+            // 小数点以下の桁数を取得
+            const aDecimals = (a.toString().split('.')[1] || '').length;
+            const bDecimals = (b.toString().split('.')[1] || '').length;
+            const factor = Math.pow(10, Math.max(aDecimals, bDecimals));
+            
+            // 整数に変換
+            a = Math.round(a * factor);
+            b = Math.round(b * factor);
+        }
+        
+        // ユークリッドの互除法
+        while (b !== 0) {
+            const temp = b;
+            b = a % b;
+            a = temp;
+        }
+        return a;
+    }
+    
+    // 約分する
+    simplify() {
+        if (this.numerator === 0) {
+            this.denominator = 1;
+            return this;
+        }
+        
+        const gcd = Fraction.gcd(this.numerator, this.denominator);
+        if (gcd !== 0 && gcd !== 1) {
+            this.numerator /= gcd;
+            this.denominator /= gcd;
+        }
+        return this;
+    }
+    
+    // 分数の加算
+    add(other, isFractionOp = false) {
+        if (!(other instanceof Fraction)) {
+            other = new Fraction(other);
+        }
+        
+        const newNumerator = this.numerator * other.denominator + other.numerator * this.denominator;
+        const newDenominator = this.denominator * other.denominator;
+        
+        // いずれかが明示的な分数演算であれば、結果も分数演算とみなす
+        const resultIsFraction = this.isFractionOperation || other.isFractionOperation || isFractionOp;
+        
+        return new Fraction(newNumerator, newDenominator, resultIsFraction);
+    }
+    
+    // 分数の減算
+    subtract(other, isFractionOp = false) {
+        if (!(other instanceof Fraction)) {
+            other = new Fraction(other);
+        }
+        
+        const newNumerator = this.numerator * other.denominator - other.numerator * this.denominator;
+        const newDenominator = this.denominator * other.denominator;
+        
+        // いずれかが明示的な分数演算であれば、結果も分数演算とみなす
+        const resultIsFraction = this.isFractionOperation || other.isFractionOperation || isFractionOp;
+        
+        return new Fraction(newNumerator, newDenominator, resultIsFraction);
+    }
+    
+    // 分数の乗算
+    multiply(other, isFractionOp = false) {
+        if (!(other instanceof Fraction)) {
+            other = new Fraction(other);
+        }
+        
+        const newNumerator = this.numerator * other.numerator;
+        const newDenominator = this.denominator * other.denominator;
+        
+        // いずれかが明示的な分数演算であれば、結果も分数演算とみなす
+        const resultIsFraction = this.isFractionOperation || other.isFractionOperation || isFractionOp;
+        
+        return new Fraction(newNumerator, newDenominator, resultIsFraction);
+    }
+    
+    // 分数の除算
+    divide(other, isFractionOp = true) {  // 除算は常に分数演算とみなす
+        if (!(other instanceof Fraction)) {
+            other = new Fraction(other);
+        }
+        
+        if (other.numerator === 0) {
+            throw new Error("Division by zero");
+        }
+        
+        const newNumerator = this.numerator * other.denominator;
+        const newDenominator = this.denominator * other.numerator;
+        
+        // 除算は常に分数演算とみなす、またはいずれかが明示的な分数演算であれば、結果も分数演算
+        const resultIsFraction = this.isFractionOperation || other.isFractionOperation || isFractionOp;
+        
+        return new Fraction(newNumerator, newDenominator, resultIsFraction);
+    }
+    
+    // 比較演算子
+    greaterThan(other) {
+        if (!(other instanceof Fraction)) {
+            other = new Fraction(other);
+        }
+        
+        return this.numerator * other.denominator > other.numerator * this.denominator;
+    }
+    
+    greaterThanOrEqual(other) {
+        if (!(other instanceof Fraction)) {
+            other = new Fraction(other);
+        }
+        
+        return this.numerator * other.denominator >= other.numerator * this.denominator;
+    }
+    
+    equals(other) {
+        if (!(other instanceof Fraction)) {
+            other = new Fraction(other);
+        }
+        
+        return this.numerator * other.denominator === other.numerator * this.denominator;
+    }
+    
+    // 文字列表現
+    toString() {
+        if (this.denominator === 1 || !this.isFractionOperation) {
+            // 分母が1の場合または明示的な分数演算でない場合は通常の数値として表示
+            return String(this.numerator / this.denominator);
+        } else {
+            // 明示的な分数演算の結果のみ分数表記で表示
+            return `${this.numerator}/${this.denominator}`;
+        }
+    }
+    
+    // 数値に変換
+    toNumber() {
+        return this.numerator / this.denominator;
+    }
+    
+    // 文字列から分数を生成（明示的な分数は分数演算としてマーク）
+    static fromString(str, isFractionOp = false) {
+        if (str.includes('/')) {
+            const [numerator, denominator] = str.split('/').map(s => parseFloat(s.trim()));
+            return new Fraction(numerator, denominator, true);  // '/'が含まれる場合は明示的な分数
+        } else {
+            return new Fraction(parseFloat(str), 1, isFractionOp);
+        }
+    }
+}
+
 // --- Configuration Parameters ---
 const CONFIG = {
     sensitivity: {
@@ -31,10 +211,397 @@ const CONFIG = {
 
 // --- 簡略化されたインタープリター ---
 const shikigamiInterpreter = {
+    variables: {},
+    functions: {},
+    
+    tokenize: function(code) {
+        // コメントを削除
+        code = code.replace(/#.*$/gm, '');
+        
+        // 分数表記の特別処理（トークン化の前に分数をマーク）
+        code = code.replace(/(\d+)\/(\d+)/g, "$1_FRAC_$2");
+        
+        // トークンに分割（文字列は保持）
+        let tokens = [];
+        let current = '';
+        let inString = false;
+        let stringChar = '';
+        
+        for (let i = 0; i < code.length; i++) {
+            const char = code[i];
+            
+            if (inString) {
+                if (char === stringChar && code[i-1] !== '\\') {
+                    inString = false;
+                    current += char;
+                    tokens.push(current);
+                    current = '';
+                } else {
+                    current += char;
+                }
+            } else if (char === '"' || char === "'") {
+                if (current.trim()) {
+                    tokens.push(current.trim());
+                    current = '';
+                }
+                inString = true;
+                stringChar = char;
+                current = char;
+            } else if (/\s/.test(char)) {
+                if (current.trim()) {
+                    tokens.push(current.trim());
+                    current = '';
+                }
+            } else if ('(){}[]+=*><,;:'.includes(char)) { // '/'を演算子リストから除外
+                if (current.trim()) {
+                    tokens.push(current.trim());
+                    current = '';
+                }
+                tokens.push(char);
+            } else {
+                current += char;
+            }
+        }
+        
+        if (current.trim()) {
+            tokens.push(current.trim());
+        }
+        
+        // 分数表記を復元
+        tokens = tokens.map(token => {
+            if (token.includes('_FRAC_')) {
+                const [numerator, denominator] = token.split('_FRAC_');
+                return numerator + '/' + denominator;
+            }
+            return token;
+        });
+        
+        return tokens.filter(t => t.trim() !== '');
+    },
+    
+    parse: function(tokens) {
+        const parseExpression = (index) => {
+            if (index >= tokens.length) {
+                throw new Error('Unexpected end of input');
+            }
+            
+            const token = tokens[index];
+            
+            // Number literal (including fractions)
+            if (/^-?\d+(\.\d+)?$/.test(token) || /^-?\d+\/\d+$/.test(token)) {
+                let value;
+                let isFraction = false;
+                
+                if (token.includes('/')) {
+                    isFraction = true;
+                    const [numerator, denominator] = token.split('/').map(n => parseFloat(n));
+                    value = new Fraction(numerator, denominator, true);
+                } else {
+                    value = new Fraction(parseFloat(token), 1, false);
+                }
+                
+                return { 
+                    type: 'number', 
+                    value: value,
+                    isFraction: isFraction,
+                    nextIndex: index + 1 
+                };
+            }
+            
+            // String literal
+            if (/^["'].*["']$/.test(token)) {
+                return { 
+                    type: 'string', 
+                    value: token.substring(1, token.length - 1), 
+                    nextIndex: index + 1 
+                };
+            }
+            
+            // Variable reference
+            if (/^[A-Z][A-Z0-9_]*$/.test(token)) {
+                return { type: 'variable', name: token, nextIndex: index + 1 };
+            }
+            
+            // Operators (in prefix notation)
+            if (['+', '-', '*', '/', '>', '>=', '=='].includes(token)) {
+                const leftExpr = parseExpression(index + 1);
+                const rightExpr = parseExpression(leftExpr.nextIndex);
+                
+                return {
+                    type: 'operation',
+                    operator: token,
+                    left: leftExpr,
+                    right: rightExpr,
+                    nextIndex: rightExpr.nextIndex
+                };
+            }
+            
+            // Assignment (SET VAR value)
+            if (token === 'SET') {
+                if (index + 2 >= tokens.length) {
+                    throw new Error('Invalid SET expression');
+                }
+                
+                const varName = tokens[index + 1];
+                if (!/^[A-Z][A-Z0-9_]*$/.test(varName)) {
+                    throw new Error(`Invalid variable name: ${varName}`);
+                }
+                
+                const valueExpr = parseExpression(index + 2);
+                
+                return {
+                    type: 'assignment',
+                    variable: varName,
+                    value: valueExpr,
+                    nextIndex: valueExpr.nextIndex
+                };
+            }
+            
+            // Conditional (IF condition thenExpr elseExpr)
+            if (token === 'IF') {
+                const conditionExpr = parseExpression(index + 1);
+                const thenExpr = parseExpression(conditionExpr.nextIndex);
+                const elseExpr = parseExpression(thenExpr.nextIndex);
+                
+                return {
+                    type: 'conditional',
+                    condition: conditionExpr,
+                    thenBranch: thenExpr,
+                    elseBranch: elseExpr,
+                    nextIndex: elseExpr.nextIndex
+                };
+            }
+            
+            // Function definition (FUNC name (param1 param2...) expr)
+            if (token === 'FUNC') {
+                if (index + 2 >= tokens.length) {
+                    throw new Error('Invalid function definition');
+                }
+                
+                const funcName = tokens[index + 1];
+                if (!/^[A-Z][A-Z0-9_]*$/.test(funcName)) {
+                    throw new Error(`Invalid function name: ${funcName}`);
+                }
+                
+                if (tokens[index + 2] !== '(') {
+                    throw new Error('Expected ( after function name');
+                }
+                
+                let paramIndex = index + 3;
+                const params = [];
+                
+                while (paramIndex < tokens.length && tokens[paramIndex] !== ')') {
+                    if (!/^[A-Z][A-Z0-9_]*$/.test(tokens[paramIndex])) {
+                        throw new Error(`Invalid parameter name: ${tokens[paramIndex]}`);
+                    }
+                    
+                    params.push(tokens[paramIndex]);
+                    paramIndex++;
+                    
+                    if (paramIndex < tokens.length && tokens[paramIndex] === ',') {
+                        paramIndex++;
+                    }
+                }
+                
+                if (paramIndex >= tokens.length || tokens[paramIndex] !== ')') {
+                    throw new Error('Expected ) after parameters');
+                }
+                
+                const bodyExpr = parseExpression(paramIndex + 1);
+                
+                return {
+                    type: 'function_definition',
+                    name: funcName,
+                    params: params,
+                    body: bodyExpr,
+                    nextIndex: bodyExpr.nextIndex
+                };
+            }
+            
+            // Function call (CALL funcName arg1 arg2...)
+            if (token === 'CALL') {
+                if (index + 1 >= tokens.length) {
+                    throw new Error('Invalid function call');
+                }
+                
+                const funcName = tokens[index + 1];
+                if (!/^[A-Z][A-Z0-9_]*$/.test(funcName)) {
+                    throw new Error(`Invalid function name: ${funcName}`);
+                }
+                
+                let nextIdx = index + 2;
+                const args = [];
+                
+                // Parse arguments
+                while (nextIdx < tokens.length) {
+                    try {
+                        const argExpr = parseExpression(nextIdx);
+                        args.push(argExpr);
+                        nextIdx = argExpr.nextIndex;
+                        
+                        // Stop if we hit a closing paren or end of statement
+                        if (nextIdx >= tokens.length || tokens[nextIdx] === ')' || tokens[nextIdx] === ';') {
+                            break;
+                        }
+                    } catch (e) {
+                        // 引数解析中にエラーが発生した場合は引数の終わりと判断
+                        break;
+                    }
+                }
+                
+                return {
+                    type: 'function_call',
+                    name: funcName,
+                    arguments: args,
+                    nextIndex: nextIdx
+                };
+            }
+            
+            // Print statement (PRINT expr)
+            if (token === 'PRINT') {
+                const expr = parseExpression(index + 1);
+                
+                return {
+                    type: 'print',
+                    expression: expr,
+                    nextIndex: expr.nextIndex
+                };
+            }
+            
+            throw new Error(`Unexpected token: ${token}`);
+        };
+        
+        // Parse program as a sequence of expressions
+        let index = 0;
+        const expressions = [];
+        
+        while (index < tokens.length) {
+            const expr = parseExpression(index);
+            expressions.push(expr);
+            index = expr.nextIndex;
+            
+            // Skip optional semicolons
+            if (index < tokens.length && tokens[index] === ';') {
+                index++;
+            }
+        }
+        
+        return expressions;
+    },
+    
+    evaluate: function(ast) {
+        const evaluateNode = (node) => {
+            switch (node.type) {
+                case 'number':
+                    // すでにFractionオブジェクトの場合はそのまま返す
+                    if (node.value instanceof Fraction) {
+                        return node.value;
+                    }
+                    // そうでなければ新たにFractionオブジェクトを作成
+                    return new Fraction(node.value, 1, node.isFraction || false);
+                    
+                case 'string':
+                    return node.value;
+                    
+                case 'variable':
+                    if (this.variables.hasOwnProperty(node.name)) {
+                        return this.variables[node.name];
+                    }
+                    throw new Error(`Undefined variable: ${node.name}`);
+                    
+                case 'operation':
+                    const left = evaluateNode(node.left);
+                    const right = evaluateNode(node.right);
+                    
+                    // 文字列の場合は通常の演算を適用
+                    if (typeof left === 'string' || typeof right === 'string') {
+                        switch (node.operator) {
+                            case '+': return String(left) + String(right);
+                            default: throw new Error(`Cannot apply operator ${node.operator} to strings`);
+                        }
+                    }
+                    
+                    // 分数演算を適用
+                    switch (node.operator) {
+                        case '+': return left.add(right, false);  // 通常の加算
+                        case '-': return left.subtract(right, false);  // 通常の減算
+                        case '*': return left.multiply(right, false);  // 通常の乗算
+                        case '/': return left.divide(right, true);  // 除算は常に分数演算
+                        case '>': return left.greaterThan(right);
+                        case '>=': return left.greaterThanOrEqual(right);
+                        case '==': return left.equals(right);
+                        default: throw new Error(`Unknown operator: ${node.operator}`);
+                    }
+                    
+                case 'assignment':
+                    const value = evaluateNode(node.value);
+                    this.variables[node.variable] = value;
+                    return value;
+                    
+                case 'conditional':
+                    const condition = evaluateNode(node.condition);
+                    if (condition === true || (condition instanceof Fraction && condition.numerator !== 0)) {
+                        return evaluateNode(node.thenBranch);
+                    } else {
+                        return evaluateNode(node.elseBranch);
+                    }
+                    
+                case 'function_definition':
+                    this.functions[node.name] = {
+                        params: node.params,
+                        body: node.body
+                    };
+                    return `Function ${node.name} defined`;
+                    
+                case 'function_call':
+                    if (!this.functions.hasOwnProperty(node.name)) {
+                        throw new Error(`Undefined function: ${node.name}`);
+                    }
+                    
+                    const func = this.functions[node.name];
+                    if (func.params.length !== node.arguments.length) {
+                        throw new Error(`Expected ${func.params.length} arguments, got ${node.arguments.length}`);
+                    }
+                    
+                    // Create new scope for function call
+                    const oldVars = {...this.variables};
+                    
+                    // Evaluate and assign arguments to parameters
+                    for (let i = 0; i < func.params.length; i++) {
+                        this.variables[func.params[i]] = evaluateNode(node.arguments[i]);
+                    }
+                    
+                    // Evaluate function body
+                    const result = evaluateNode(func.body);
+                    
+                    // Restore old scope
+                    this.variables = oldVars;
+                    
+                    return result;
+                    
+                case 'print':
+                    const printValue = evaluateNode(node.expression);
+                    console.log(printValue);
+                    return printValue;
+                    
+                default:
+                    throw new Error(`Unknown node type: ${node.type}`);
+            }
+        };
+        
+        let result;
+        for (const expr of ast) {
+            result = evaluateNode(expr);
+        }
+        
+        return result;
+    },
+    
     execute: function(code) {
         try {
             console.log("実行コード:", code);
-            // FizzBuzz のショートカット (デモ用)
+            
+            // Keep backward compatibility with the demo examples
             if (code.includes("FIZZBUZZ")) {
                 let maxNum = 20;
                 const match = code.match(/FIZZBUZZ\s*\(\s*(\d+)\s*\)/);
@@ -51,13 +618,30 @@ const shikigamiInterpreter = {
                 }
                 return result.join(", ");
             }
-            // 簡易実行 (デモ用)
-            if (code.includes("PRINT")) {
+            
+            if (code.match(/PRINT\s*\(\s*["'](.*)["']\s*\)/)) {
                 const match = code.match(/PRINT\s*\(\s*["'](.*)["']\s*\)/);
                 if (match && match[1]) return match[1];
             }
-            return "実行完了 (実際の言語処理は実装中)";
+            
+            // For other code, use our new parser and evaluator
+            const tokens = this.tokenize(code);
+            console.log("Tokens:", tokens);
+            
+            const ast = this.parse(tokens);
+            console.log("AST:", JSON.stringify(ast, null, 2));
+            
+            const result = this.evaluate(ast);
+            console.log("Result:", result);
+            
+            // 結果を文字列化して返す
+            if (result instanceof Fraction) {
+                return result.toString();
+            }
+            
+            return result !== undefined ? String(result) : "実行完了";
         } catch (error) {
+            console.error("Interpreter error:", error);
             return `エラー: ${error.message}`;
         }
     }
