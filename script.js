@@ -972,23 +972,62 @@ const handleSpecialButtonClick = (e, type, actions) => {
 const executeCode = () => {
     const code = elements.input ? elements.input.value : '';
     if (!code.trim()) return;
+
+    let isShikigamiSuccess = false; // shikigami言語レベルでの成功フラグ
+
     try {
+        // 式神コードを実行
         const result = shikigamiInterpreter.execute(code);
-        if (elements.output) {
-            elements.output.value = result !== undefined ? String(result) : "実行完了";
-            elements.output.classList.add('executed');
-            setTimeout(() => elements.output.classList.remove('executed'), 300);
+        const resultString = result !== undefined ? String(result) : "実行完了"; // 結果を文字列化（出力用）
+
+        // ★★★ shikigamiInterpreter がエラーを返り値で示すかチェック ★★★
+        // この条件は、shikigamiInterpreterの仕様に合わせてください。
+        // 例1: エラー時に null や undefined を返す場合
+        // if (result === null || result === undefined) { ... }
+        // 例2: エラー時に特定の文字列（例: "エラー:" で始まる）を返す場合
+        // if (typeof resultString === 'string' && resultString.startsWith("エラー:")) { ... }
+        // 例3: エラー時に { success: false, ... } のようなオブジェクトを返す場合
+        // if (typeof result === 'object' && result && result.success === false) { ... }
+
+        // ここでは、あなたの最初のコードにあったように、
+        // エラーメッセージが文字列で返されると仮定します。
+        if (typeof resultString === 'string' && resultString.startsWith("エラー:")) {
+            // shikigami言語レベルのエラーが返ってきた場合
+            isShikigamiSuccess = false;
+            if (elements.output) {
+                elements.output.value = resultString; // エラーメッセージを出力
+            }
+        } else {
+            // shikigami言語レベルで成功した場合
+            isShikigamiSuccess = true;
+            if (elements.output) {
+                elements.output.value = resultString; // 正常な結果または「実行完了」を出力
+                elements.output.classList.add('executed');
+                setTimeout(() => elements.output.classList.remove('executed'), 300);
+            }
         }
-        // ★★★ 実行後に output を表示 ★★★
-        showOutputSection(); // 実行結果を表示する関数を呼ぶ
-        if (!String(result).startsWith("エラー:") && elements.input) {
+
+        // outputセクションを表示 (エラーでも成功でも表示)
+        showOutputSection();
+
+        // ★★★ shikigami言語レベルで成功した場合のみ、入力エリアをクリア ★★★
+        if (isShikigamiSuccess && elements.input) {
+            elements.input.value = ''; // 入力内容を消去
         }
+        // isShikigamiSuccess が false の場合は、入力はクリアされない
+
     } catch (err) {
+        // ★★★ JavaScriptレベルのエラー (例: Interpreter自体のバグや致命的な構文エラー) ★★★
+        isShikigamiSuccess = false; // JSエラーも失敗とみなす
         if (elements.output) {
-            elements.output.value = `エラー: ${err.message}`;
+            // 出力エリアにJSエラーメッセージを表示
+            elements.output.value = `致命的なエラー: ${err.message}`;
         }
-        // ★★★ エラー時も output を表示 ★★★
-        showOutputSection(); // エラー表示のために output を表示
+        // outputセクションを表示
+        showOutputSection();
+
+        // ★★★ JSエラーの場合も入力エリアは変更しない ★★★
+        // (catchブロック内では input をクリアしない)
     }
 };
 
