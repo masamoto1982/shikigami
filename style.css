@@ -104,6 +104,11 @@ section:last-child {
     gap: 10px;
     margin-bottom: 10px;
     align-items: center;
+    padding: 5px;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select: none;
 }
 
 .dot-row {
@@ -128,6 +133,8 @@ section:last-child {
     position: relative;
     transition: background-color 0.1s;
     flex-shrink: 0;
+    touch-action: none;
+    box-sizing: border-box;
 }
 
 .dot.numeric {
@@ -148,6 +155,13 @@ section:last-child {
 .dot.detected {
     background-color: #fca5a5;
     border-color: #ef4444;
+    transform: scale(0.95);
+}
+
+.dot.tapped-feedback {
+    background-color: #fde68a;
+    transform: scale(0.95);
+    transition: background-color 0.1s, transform 0.1s;
 }
 
 #special-row {
@@ -171,6 +185,11 @@ section:last-child {
     background-color: #e5e7eb;
     flex-shrink: 0;
     transition: transform 0.1s, background-color 0.1s;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    text-align: center;
 }
 
 .special-button.delete {
@@ -179,6 +198,10 @@ section:last-child {
 
 .special-button.space {
     background-color: #f8f8f8;
+}
+
+.special-button:active {
+    background-color: #9ca3af;
 }
 
 .special-button.long-pressed {
@@ -192,7 +215,7 @@ section:last-child {
 }
 
 #special-row .dot.numeric {
-     flex-shrink: 0;
+    flex-shrink: 0;
 }
 
 #line-canvas {
@@ -205,12 +228,40 @@ section:last-child {
     z-index: 10;
 }
 
-/* Execute Button Style */
+.button-container {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 10px auto;
+    width: 100%;
+}
+
+#clear-button {
+    display: block;
+    width: 100px;
+    padding: 10px;
+    background-color: #ef4444;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#clear-button:hover {
+    background-color: #dc2626;
+}
+
+#clear-button:active {
+    background-color: #b91c1c;
+}
+
 #execute-button {
     display: block;
     width: 100px;
     padding: 10px;
-    margin: 10px auto;  /* 中央寄せ */
     background-color: #3b82f6;
     color: white;
     border: none;
@@ -227,53 +278,6 @@ section:last-child {
 
 #execute-button:active {
     background-color: #1d4ed8;
-}
-
-/* Debug Panel Styles */
-#debug-panel {
-    margin-top: 20px;
-    padding: 10px;
-    background-color: #f8fafc;
-    border: 1px solid #cbd5e1;
-    border-radius: 5px;
-}
-
-.control-container {
-    display: flex;
-    align-items: center;
-    margin: 8px 0;
-}
-
-.control-container label {
-    min-width: 120px;
-}
-
-.control-container input[type="range"] {
-    flex-grow: 1;
-    margin: 0 10px;
-}
-
-.value-display {
-    min-width: 40px;
-    text-align: right;
-}
-
-.debug-output {
-    margin-top: 10px;
-    padding: 10px;
-    background-color: #f1f5f9;
-    border-radius: 4px;
-    max-height: 150px;
-    overflow-y: auto;
-    font-family: monospace;
-    font-size: 12px;
-}
-
-/* ダブルタップのビジュアルフィードバック */
-.dot.double-tapped {
-    background-color: #fde68a;
-    transform: scale(0.95);
-    transition: background-color 0.2s, transform 0.2s;
 }
 
 /* 認識フィードバックのスタイル */
@@ -294,7 +298,7 @@ section:last-child {
     color: #3b82f6;
     animation: fadeOut 0.8s ease-out forwards;
     pointer-events: none;
-    z-index: 100; /* 確実に前面に表示 */
+    z-index: 100;
 }
 
 /* フェードアウトアニメーション */
@@ -310,13 +314,17 @@ section:last-child {
     }
 }
 
+@keyframes feedback-pulse {
+    0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+    50% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+}
+
 /* Responsive layout */
 @media (max-width: 768px) {
-
     #mobile-container {
         display: flex;
         flex-direction: column;
-        /* Assuming 80px header/footer space, adjust if needed */
         height: calc(100vh - 80px);
     }
 
@@ -336,12 +344,11 @@ section:last-child {
 
     #output,
     #txt-input {
-        /* Adjusted height for mobile */
         height: 200px;
     }
 
     #txt-input {
-         min-height: 6rem; /* Original mobile specific min-height */
+        min-height: 6rem;
     }
 
     .hide {
@@ -353,13 +360,8 @@ section:last-child {
         min-height: 300px;
     }
 
-    #debug-panel {
-        display: none;
-    }
-
-    /* モバイル用にタッチ操作を調整 */
     body {
-        overflow-x: hidden; /* 横スクロール防止 */
+        overflow-x: hidden;
     }
 }
 
@@ -377,7 +379,6 @@ section:last-child {
         display: block;
     }
 
-    /* Restore desktop heights if they were overridden in mobile */
     #output,
     #txt-input {
          height: 500px;
