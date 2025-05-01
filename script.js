@@ -35,123 +35,72 @@ const Fraction = (() => {
     
     // 分母が負の場合は分子・分母ともに符号を反転
     if (fraction.denominator < 0) {
-      fraction.numerator = -fraction.numerator;
-      fraction.denominator = -fraction.denominator;
+      fraction.numerator *= -1;
+      fraction.denominator *= -1;
     }
     
-    // 明示的な分数演算の場合はフラグをセット
-    fraction.isFractionOperation = isFractionOperation;
-    
-    // メソッドを追加
-    fraction.simplify = () => {
-      if (fraction.numerator === 0) {
-        fraction.denominator = 1;
-        return fraction;
-      }
-      
+    // 約分
+    if (!isFractionOperation) {
       const divisor = gcd(fraction.numerator, fraction.denominator);
-      if (divisor !== 0 && divisor !== 1) {
-        fraction.numerator /= divisor;
-        fraction.denominator /= divisor;
-      }
-      return fraction;
+      fraction.numerator /= divisor;
+      fraction.denominator /= divisor;
+    }
+    
+    // メソッド
+    fraction.add = (other, isFractionOp = true) => {
+      const a = fraction;
+      const b = other;
+      const numerator = a.numerator * b.denominator + b.numerator * a.denominator;
+      const denominator = a.denominator * b.denominator;
+      return Fraction(numerator, denominator, isFractionOp);
     };
     
-    fraction.add = (other, isFractionOp = false) => {
-      const otherFraction = other.numerator !== undefined ? other : constructor(other);
-      
-      const newNumerator = fraction.numerator * otherFraction.denominator + 
-                           otherFraction.numerator * fraction.denominator;
-      const newDenominator = fraction.denominator * otherFraction.denominator;
-      
-      // いずれかが明示的な分数演算であれば、結果も分数演算とみなす
-      const resultIsFraction = fraction.isFractionOperation || 
-                               otherFraction.isFractionOperation || 
-                               isFractionOp;
-      
-      return constructor(newNumerator, newDenominator, resultIsFraction);
+    fraction.subtract = (other, isFractionOp = true) => {
+      const a = fraction;
+      const b = other;
+      const numerator = a.numerator * b.denominator - b.numerator * a.denominator;
+      const denominator = a.denominator * b.denominator;
+      return Fraction(numerator, denominator, isFractionOp);
     };
     
-    fraction.subtract = (other, isFractionOp = false) => {
-      const otherFraction = other.numerator !== undefined ? other : constructor(other);
-      
-      const newNumerator = fraction.numerator * otherFraction.denominator - 
-                           otherFraction.numerator * fraction.denominator;
-      const newDenominator = fraction.denominator * otherFraction.denominator;
-      
-      const resultIsFraction = fraction.isFractionOperation || 
-                               otherFraction.isFractionOperation || 
-                               isFractionOp;
-      
-      return constructor(newNumerator, newDenominator, resultIsFraction);
-    };
-    
-    fraction.multiply = (other, isFractionOp = false) => {
-      const otherFraction = other.numerator !== undefined ? other : constructor(other);
-      
-      const newNumerator = fraction.numerator * otherFraction.numerator;
-      const newDenominator = fraction.denominator * otherFraction.denominator;
-      
-      const resultIsFraction = fraction.isFractionOperation || 
-                               otherFraction.isFractionOperation || 
-                               isFractionOp;
-      
-      return constructor(newNumerator, newDenominator, resultIsFraction);
+    fraction.multiply = (other, isFractionOp = true) => {
+      const numerator = fraction.numerator * other.numerator;
+      const denominator = fraction.denominator * other.denominator;
+      return Fraction(numerator, denominator, isFractionOp);
     };
     
     fraction.divide = (other, isFractionOp = true) => {
-      const otherFraction = other.numerator !== undefined ? other : constructor(other);
-      
-      if (otherFraction.numerator === 0) {
+      if (other.numerator === 0) {
         throw new Error("Division by zero");
       }
-      
-      const newNumerator = fraction.numerator * otherFraction.denominator;
-      const newDenominator = fraction.denominator * otherFraction.numerator;
-      
-      const resultIsFraction = fraction.isFractionOperation || 
-                               otherFraction.isFractionOperation || 
-                               isFractionOp;
-      
-      return constructor(newNumerator, newDenominator, resultIsFraction);
-    };
-    
-    fraction.greaterThan = (other) => {
-      const otherFraction = other.numerator !== undefined ? other : constructor(other);
-      
-      return fraction.numerator * otherFraction.denominator > 
-             otherFraction.numerator * fraction.denominator;
-    };
-    
-    fraction.greaterThanOrEqual = (other) => {
-      const otherFraction = other.numerator !== undefined ? other : constructor(other);
-      
-      return fraction.numerator * otherFraction.denominator >= 
-             otherFraction.numerator * fraction.denominator;
+      const numerator = fraction.numerator * other.denominator;
+      const denominator = fraction.denominator * other.numerator;
+      return Fraction(numerator, denominator, isFractionOp);
     };
     
     fraction.equals = (other) => {
-      const otherFraction = other.numerator !== undefined ? other : constructor(other);
-      
-      return fraction.numerator * otherFraction.denominator === 
-             otherFraction.numerator * fraction.denominator;
+      return fraction.numerator * other.denominator === other.numerator * fraction.denominator;
+    };
+    
+    fraction.greaterThan = (other) => {
+      return fraction.numerator * other.denominator > other.numerator * fraction.denominator;
+    };
+    
+    fraction.greaterThanOrEqual = (other) => {
+      return fraction.numerator * other.denominator >= other.numerator * fraction.denominator;
     };
     
     fraction.toString = () => {
-      if (fraction.denominator === 1 || !fraction.isFractionOperation) {
-        return String(fraction.numerator / fraction.denominator);
-      } else {
-        return `${fraction.numerator}/${fraction.denominator}`;
-      }
+      if (fraction.denominator === 1) return String(fraction.numerator);
+      return `${fraction.numerator}/${fraction.denominator}`;
     };
     
-    fraction.toNumber = () => fraction.numerator / fraction.denominator;
+    fraction.valueOf = () => fraction.numerator / fraction.denominator;
     
-    // 約分して返す
-    return fraction.simplify();
+    return fraction;
   };
   
-  // 文字列から分数を生成
+  // 文字列からFractionを生成
   constructor.fromString = (str, isFractionOp = false) => {
     if (str.includes('/')) {
       const [numerator, denominator] = str.split('/').map(s => parseFloat(s.trim()));
@@ -172,12 +121,11 @@ const shikigamiInterpreter = (() => {
     functions: {}
   };
   
-  // トークン化 - コードを意味のある単位に分割
+  // トークン化
   const tokenize = (code) => {
-    // コメントを削除
+    // 行コメントの除去
     code = code.replace(/#.*$/gm, '');
-    
-    // 分数表記の特別処理（トークン化の前に分数をマーク）
+    // 分数を一時置換（例: 3/4 → 3_FRAC_4）
     code = code.replace(/(\d+)\/(\d+)/g, "$1_FRAC_$2");
     
     // トークンに分割（文字列は保持）
@@ -212,7 +160,7 @@ const shikigamiInterpreter = (() => {
             tokens.push(current.trim());
             current = '';
           }
-        } else if ('(){}[]+=*><,;:'.includes(char)) { // '/'を演算子リストから除外
+        } else if (['(', ')', ',', ';'].includes(char)) {
           if (current.trim()) {
             tokens.push(current.trim());
             current = '';
@@ -284,7 +232,7 @@ const shikigamiInterpreter = (() => {
       
       // 変数参照または関数呼び出し
       if (/^[A-Z][A-Z0-9_]*$/.test(token)) {
-        // 関数呼び出しを確認
+        // 関数呼び出しを確認（括弧あり）
         if (index + 1 < tokens.length && tokens[index + 1] === '(') {
           const parseArguments = () => {
             let paramIndex = index + 2;
@@ -316,6 +264,26 @@ const shikigamiInterpreter = (() => {
             arguments: args,
             nextIndex
           };
+        }
+        
+        // 関数呼び出し（括弧なし、ポーランド記法）
+        else if (state.functions[token] && index + 1 < tokens.length) {
+          const paramCount = state.functions[token].params.length;
+          if (paramCount > 0) {
+            const args = [];
+            let argIndex = index + 1;
+            for (let i = 0; i < paramCount; i++) {
+              const argExpr = parseExpression(argIndex);
+              args.push(argExpr);
+              argIndex = argExpr.nextIndex;
+            }
+            return {
+              type: 'function_call',
+              name: token,
+              arguments: args,
+              nextIndex: argIndex
+            };
+          }
         }
         
         // 通常の変数参照
@@ -365,6 +333,8 @@ const shikigamiInterpreter = (() => {
             
             const { params, bodyStartIndex } = parseParameters();
             const bodyExpr = parseExpression(bodyStartIndex);
+            // Store function signature for later calls during parsing
+            state.functions[varName] = { params, body: bodyExpr };
             
             return {
               type: 'function_definition',
@@ -376,10 +346,6 @@ const shikigamiInterpreter = (() => {
           }
           
           // 通常の変数代入
-          if (!/^[A-Z][A-Z0-9_]*$/.test(varName)) {
-            throw new Error(`Invalid variable name: ${varName}`);
-          }
-          
           const valueExpr = parseExpression(index + 2);
           
           return {
@@ -515,7 +481,7 @@ const shikigamiInterpreter = (() => {
           functions: scope.functions
         };
         
-        // 引数を評価して関数スコープに追加
+        // 引数を束縛
         node.arguments.forEach((arg, index) => {
           functionScope.variables[func.params[index]] = evaluateNode(arg, scope);
         });
@@ -554,7 +520,7 @@ const shikigamiInterpreter = (() => {
     return evaluateProgram();
   };
   
-  // コード実行のエントリーポイント
+  // 公開インターフェース
   const execute = (code) => {
     try {
       console.log("実行コード:", code);
@@ -585,21 +551,15 @@ const shikigamiInterpreter = (() => {
       console.log("AST:", JSON.stringify(ast, null, 2));
       
       const result = evaluate(ast);
-      console.log("Result:", result);
-      
-      // 結果を文字列化して返す
-      if (result && result.numerator !== undefined) {
-        return result.toString();
-      }
-      
-      return result !== undefined ? String(result) : "実行完了";
-    } catch (error) {
-      console.error("Interpreter error:", error);
-      return `エラー: ${error.message}`;
+      console.log("Result:", result.toString ? result.toString() : result);
+      return result.toString ? result.toString() : result;
+    } catch (err) {
+      console.error(err);
+      return `Error: ${err.message}`;
     }
   };
   
-  // 公開インターフェース
+  // 公開メソッド
   return {
     variables: state.variables,
     functions: state.functions,
