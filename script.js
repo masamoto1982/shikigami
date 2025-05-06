@@ -413,23 +413,38 @@ const focusOnInput = () => {
     }
 };
 
+// Modified to work with contenteditable div instead of textarea
 const insertAtCursor = (text) => {
-    const textarea = elements.input;
-    if (!textarea) return;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const textBefore = textarea.value.substring(0, start);
-    const textAfter = textarea.value.substring(end);
-    textarea.value = textBefore + text + textAfter;
-    const newCursorPos = start + text.length;
-    textarea.selectionStart = textarea.selectionEnd = newCursorPos;
+    const editor = elements.input;
+    if (!editor) return;
+    
+    const selection = window.getSelection();
+    if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        const currentColor = document.querySelector('.color-btn.active')?.dataset.color || 'black';
+        
+        const span = document.createElement('span');
+        span.style.color = currentColor;
+        span.textContent = text;
+        
+        range.deleteContents();
+        range.insertNode(span);
+        
+        // Move cursor after the inserted span
+        range.setStartAfter(span);
+        range.setEndAfter(span);
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+    
     if (isMobileDevice()) showTextSection();
     focusOnInput();
 };
 
+// Updated for contenteditable div
 const clearInput = () => {
     if (elements.input) {
-        elements.input.value = '';
+        elements.input.innerHTML = '';
         focusOnInput();
     }
 };
@@ -610,71 +625,101 @@ const startDrawing = (dotEl, x, y) => {
 };
 
 // --- Event Handlers ---
+// Updated for contenteditable div
 const handleDeleteAction = (deleteToken = false) => {
-    const ta = elements.input;
-    if (!ta) return;
-    const pos = ta.selectionStart;
-    if (pos > 0) {
-        let before = ta.value.substring(0, pos);
-        const after = ta.value.substring(pos);
+    const editor = elements.input;
+    if (!editor) return;
+    
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    
+    const range = selection.getRangeAt(0);
+    
+    if (range.collapsed) {
+        // Cursor is collapsed (no selection)
         if (deleteToken) {
-            const lastNewline = before.lastIndexOf('\n');
-            const lastSpace = before.lastIndexOf(' ');
-            let cutoff = Math.max(lastNewline, lastSpace);
-            if (cutoff === -1) {
-                 cutoff = 0;
-            } else if (lastNewline !== -1 && lastNewline === pos -1) {
-                 cutoff = lastNewline;
-            } else if (lastSpace !== -1 && lastSpace === pos - 1 && !/\s/.test(before.charAt(pos-2))) {
-                 cutoff = lastSpace;
-            } else if (lastNewline > lastSpace) {
-                 cutoff = lastNewline + 1;
-            } else if (lastSpace > lastNewline) {
-                 cutoff = lastSpace + 1;
-            } else {
-                 cutoff = 0;
+            // Delete whole token/word
+            const newRange = range.cloneRange();
+            
+            // Get previous content up to cursor
+            const tempRange = document.createRange();
+            tempRange.selectNodeContents(editor);
+            tempRange.setEnd(range.startContainer, range.startOffset);
+            const contentBefore = tempRange.toString();
+            
+            if (!contentBefore.length) return;
+            
+            let startPos = contentBefore.length;
+            
+            // Find start of the token
+            while (startPos > 0) {
+                const char = contentBefore.charAt(startPos - 1);
+                if (char === ' ' || char === '\n') {
+                    break;
+                }
+                startPos--;
             }
             
-            if (before.trim() === '') cutoff = 0;
-            before = before.slice(0, cutoff);
+            // Calculate how many characters to delete
+            const charsToDelete = contentBefore.length - startPos;
+            
+            if (charsToDelete > 0) {
+                // Create a range for deletion
+                newRange.setStart(range.startContainer, range.startOffset - charsToDelete);
+                newRange.setEnd(range.startContainer, range.startOffset);
+                newRange.deleteContents();
+            }
         } else {
-            before = before.slice(0, -1);
+            // Just delete one character
+            if (range.startOffset > 0) {
+                // If we're in a text node, just move back one character
+                if (range.startContainer.nodeType === Node.TEXT_NODE) {
+                    range.setStart(range.startContainer, range.startOffset - 1);
+                } else {
+                    // We're at the start of an element, need to find the previous text node
+                    // This is simplified and may not handle all edge cases
+                    const prevNode = range.startContainer.childNodes[range.startOffset - 1];
+                    if (prevNode) {
+                        if (prevNode.nodeType === Node.TEXT_NODE) {
+                            range.setStart(prevNode, prevNode.length - 1);
+                        } else {
+                            // Complex case, find the last text node inside this element
+                            const lastTextNode = findLastTextNode(prevNode);
+                            if (lastTextNode) {
+                                range.setStart(lastTextNode, lastTextNode.length - 1);
+                            }
+                        }
+                    }
+                }
+                range.deleteContents();
+            }
         }
-        ta.value = before + after;
-        ta.selectionStart = ta.selectionEnd = before.length;
+    } else {
+        // There's a selection, just delete it
+        range.deleteContents();
     }
+    
     if (isMobileDevice()) showTextSection();
     focusOnInput();
 };
 
-const handleSpecialButtonClick = (e, type, actions) => {
-    if (e && e.preventDefault) e.preventDefault();
-    const now = Date.now();
-    if (specialButtonState.clickTarget === type &&
-        now - specialButtonState.lastClickTime < specialButtonState.doubleClickDelay) {
-        clearTimeout(specialButtonState.clickTimer);
-        specialButtonState.clickCount = 0;
-        specialButtonState.clickTarget = null;
-        specialButtonState.clickTimer = null;
-        if (actions.double) actions.double();
-    } else {
-        specialButtonState.clickCount = 1;
-        specialButtonState.lastClickTime = now;
-        specialButtonState.clickTarget = type;
-        clearTimeout(specialButtonState.clickTimer);
-        specialButtonState.clickTimer = setTimeout(() => {
-            if (specialButtonState.clickCount === 1 && specialButtonState.clickTarget === type) {
-                if (actions.single) actions.single();
-            }
-            specialButtonState.clickCount = 0;
-            specialButtonState.clickTarget = null;
-            specialButtonState.clickTimer = null;
-        }, specialButtonState.doubleClickDelay);
+// Helper function to find the last text node in an element
+const findLastTextNode = (element) => {
+    if (element.nodeType === Node.TEXT_NODE) return element;
+    
+    for (let i = element.childNodes.length - 1; i >= 0; i--) {
+        const lastNode = findLastTextNode(element.childNodes[i]);
+        if (lastNode) return lastNode;
     }
+    
+    return null;
 };
 
 const executeCode = () => {
-    const code = elements.input ? elements.input.value : '';
+    // Get plain text from the rich text editor
+    const editor = elements.input;
+    const code = editor ? editor.textContent || editor.innerText : '';
+    
     if (!code.trim()) return;
     let isShikigamiSuccess = false;
     try {
@@ -700,8 +745,8 @@ const executeCode = () => {
         // outputセクションを表示 (エラーでも成功でも表示)
         showOutputSection();
         // 成功した場合のみ、入力エリアをクリア
-        if (isShikigamiSuccess && elements.input) {
-            elements.input.value = '';
+        if (isShikigamiSuccess && editor) {
+            editor.innerHTML = '';
         }
         focusOnInput();
     } catch (err) {
@@ -712,6 +757,34 @@ const executeCode = () => {
         }
         showOutputSection();
         focusOnInput();
+    }
+};
+
+
+		
+		const handleSpecialButtonClick = (e, type, actions) => {
+    if (e && e.preventDefault) e.preventDefault();
+    const now = Date.now();
+    if (specialButtonState.clickTarget === type &&
+        now - specialButtonState.lastClickTime < specialButtonState.doubleClickDelay) {
+        clearTimeout(specialButtonState.clickTimer);
+        specialButtonState.clickCount = 0;
+        specialButtonState.clickTarget = null;
+        specialButtonState.clickTimer = null;
+        if (actions.double) actions.double();
+    } else {
+        specialButtonState.clickCount = 1;
+        specialButtonState.lastClickTime = now;
+        specialButtonState.clickTarget = type;
+        clearTimeout(specialButtonState.clickTimer);
+        specialButtonState.clickTimer = setTimeout(() => {
+            if (specialButtonState.clickCount === 1 && specialButtonState.clickTarget === type) {
+                if (actions.single) actions.single();
+            }
+            specialButtonState.clickCount = 0;
+            specialButtonState.clickTarget = null;
+            specialButtonState.clickTimer = null;
+        }, specialButtonState.doubleClickDelay);
     }
 };
 
@@ -1169,6 +1242,8 @@ const initRichTextEditor = () => {
     // Function to insert colored text at current selection
     const insertColoredText = (text, color) => {
         const selection = window.getSelection();
+        if (!selection.rangeCount) return;
+        
         const range = selection.getRangeAt(0);
         
         // Create a colored span
@@ -1198,233 +1273,25 @@ const initRichTextEditor = () => {
         insertColoredText(text, currentColor);
     });
     
-    // Helper to get plain text content
-    const getPlainText = () => {
-        return editor.innerText || editor.textContent;
-    };
+    // Make insertAtCursor use the insertColoredText function
+// 正しく動作するようwindow.insertAtCursor関数を定義
+window.insertAtCursor = (text) => {
+    if (!editor) return;
     
-    // Update the execute and clear button handlers
-    const executeButton = document.getElementById('execute-button');
-    if (executeButton) {
-        executeButton.removeEventListener('click', executeCode);
-        executeButton.addEventListener('click', () => {
-            const code = getPlainText(); // Get plain text without color formatting
-            if (!code.trim()) return;
-            
-            let isShikigamiSuccess = false;
-            try {
-                // Execute shikigami code
-                const result = shikigamiInterpreter.execute(code);
-                const resultString = result !== undefined ? String(result) : "実行完了";
-                
-                if (typeof resultString === 'string' && resultString.startsWith("エラー:")) {
-                    // Shikigami language error
-                    isShikigamiSuccess = false;
-                    if (elements.output) {
-                        elements.output.value = resultString;
-                    }
-                } else {
-                    // Shikigami language success
-                    isShikigamiSuccess = true;
-                    if (elements.output) {
-                        elements.output.value = resultString;
-                        elements.output.classList.add('executed');
-                        setTimeout(() => elements.output.classList.remove('executed'), 300);
-                    }
-                }
-                
-                // Show output section
-                showOutputSection();
-                
-                // Clear input if successful
-                if (isShikigamiSuccess && editor) {
-                    editor.innerHTML = '';
-                }
-                
-                focusOnInput();
-            } catch (err) {
-                // JavaScript level error
-                isShikigamiSuccess = false;
-                if (elements.output) {
-                    elements.output.value = `致命的なエラー: ${err.message}`;
-                }
-                showOutputSection();
-                focusOnInput();
-            }
-        });
-    }
+    // アクティブな色を取得
+    const currentActiveColor = document.querySelector('.color-btn.active')?.dataset.color || 'black';
     
-    // Update clear button
-    const clearButton = document.getElementById('clear-button');
-    if (clearButton) {
-        clearButton.removeEventListener('click', clearInput);
-        clearButton.addEventListener('click', () => {
-            if (editor) {
-                editor.innerHTML = '';
-                focusOnInput();
-            }
-        });
-    }
+    insertColoredText(text, currentActiveColor);
     
-    // Update the insertAtCursor function
-    window.insertAtCursor = (text) => {
-        if (!editor) return;
-        
-        insertColoredText(text, currentColor);
-        
-        if (isMobileDevice()) showTextSection();
-        focusOnInput();
-    };
-    
-    // Update focusOnInput
-    window.focusOnInput = () => {
-        if (editor) {
-            editor.focus();
-            
-            // Move cursor to end if needed
-            const selection = window.getSelection();
-            const range = document.createRange();
-            
-            if (editor.childNodes.length > 0) {
-                const lastNode = editor.childNodes[editor.childNodes.length - 1];
-                if (lastNode.nodeType === Node.TEXT_NODE) {
-                    range.setStart(lastNode, lastNode.length);
-                    range.setEnd(lastNode, lastNode.length);
-                } else {
-                    range.setStartAfter(lastNode);
-                    range.setEndAfter(lastNode);
-                }
-            } else {
-                range.setStart(editor, 0);
-                range.setEnd(editor, 0);
-            }
-            
-            selection.removeAllRanges();
-            selection.addRange(range);
-        }
-    };
-    
-    // Update clearInput
-    window.clearInput = () => {
-        if (editor) {
-            editor.innerHTML = '';
-            focusOnInput();
-        }
-    };
-    
-    // Update handleDeleteAction
-    window.handleDeleteAction = (deleteToken = false) => {
-        if (!editor) return;
-        
-        const selection = window.getSelection();
-        if (!selection.rangeCount) return;
-        
-        const range = selection.getRangeAt(0);
-        
-        if (range.collapsed) {
-            // Cursor is collapsed (no selection)
-            if (deleteToken) {
-                // Delete whole token/word
-                const newRange = range.cloneRange();
-                const content = editor.textContent;
-                const cursorPos = getCursorPosition(editor);
-                
-                if (cursorPos === 0) return;
-                
-                let startPos = cursorPos;
-                
-                // Find start of the token
-                while (startPos > 0) {
-                    const char = content.charAt(startPos - 1);
-                    if (char === ' ' || char === '\n') {
-                        break;
-                    }
-                    startPos--;
-                }
-                
-                // Create a range from start of token to cursor position
-                const textNode = findNodeAtPosition(editor, startPos);
-                if (textNode) {
-                    const nodeOffset = getNodeOffset(editor, textNode);
-                    newRange.setStart(textNode, startPos - nodeOffset);
-                    selection.removeAllRanges();
-                    selection.addRange(newRange);
-                    document.execCommand('delete', false);
-                }
-            } else {
-                // Just delete one character
-                range.setStart(range.startContainer, range.startOffset - 1);
-                range.deleteContents();
-            }
-        } else {
-            // There's a selection, just delete it
-            range.deleteContents();
-        }
-        
-        if (isMobileDevice()) showTextSection();
-        focusOnInput();
-    };
-    
-    // Helper function to get cursor position
-    const getCursorPosition = (element) => {
-        let position = 0;
-        const selection = window.getSelection();
-        if (selection.rangeCount !== 0) {
-            const range = selection.getRangeAt(0);
-            const preCaretRange = range.cloneRange();
-            preCaretRange.selectNodeContents(element);
-            preCaretRange.setEnd(range.endContainer, range.endOffset);
-            position = preCaretRange.toString().length;
-        }
-        return position;
-    };
-    
-    // Helper function to find node at position
-    const findNodeAtPosition = (rootNode, position) => {
-        const treeWalker = document.createTreeWalker(
-            rootNode,
-            NodeFilter.SHOW_TEXT,
-            null,
-            false
-        );
-        
-        let currentPosition = 0;
-        let currentNode = treeWalker.nextNode();
-        
-        while (currentNode) {
-            const nodeLength = currentNode.nodeValue.length;
-            if (currentPosition + nodeLength >= position) {
-                return currentNode;
-            }
-            currentPosition += nodeLength;
-            currentNode = treeWalker.nextNode();
-        }
-        
-        return null;
-    };
-    
-    // Helper function to get node offset
-    const getNodeOffset = (rootNode, targetNode) => {
-        const treeWalker = document.createTreeWalker(
-            rootNode,
-            NodeFilter.SHOW_TEXT,
-            null,
-            false
-        );
-        
-        let offset = 0;
-        let currentNode = treeWalker.nextNode();
-        
-        while (currentNode && currentNode !== targetNode) {
-            offset += currentNode.nodeValue.length;
-            currentNode = treeWalker.nextNode();
-        }
-        
-        return offset;
-    };
+    if (isMobileDevice()) showTextSection();
+    focusOnInput();
+};
     
     // Initial focus
     focusOnInput();
+    
+    // Set black as the initial active color
+    document.getElementById('color-black').classList.add('active');
 };
 
 // --- Initialization on load ---
@@ -1434,6 +1301,6 @@ window.addEventListener('DOMContentLoaded', () => {
     setupExecuteButtonListener();
     setupClearButtonListener();
     setupKeyboardHandlers();
-    initRichTextEditor(); // Initialize the rich text editor
+    initRichTextEditor(); // リッチテキストエディタを初期化
     focusOnInput();
 });
