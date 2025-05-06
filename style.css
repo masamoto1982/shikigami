@@ -419,7 +419,7 @@ section:last-child {
 
     #output,
     #txt-input {
-        height: 200px;
+        height: 100px;
     }
 
     #txt-input {
@@ -427,7 +427,7 @@ section:last-child {
     }
 	
 	 #txt-input.editor {
-        height: 200px;
+        height: 100px;
     }
 
     .hide {
@@ -460,6 +460,6 @@ section:last-child {
 
     #output,
     #txt-input {
-         height: 500px;
+         height: 200px;
     }
 }
