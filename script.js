@@ -75,8 +75,8 @@ const Fraction = (() => {
   return constructor;
 })();
 
-// ShikigamiInterpreter
-const shikigamiInterpreter = (() => {
+// Interpreter - 名前変更
+const interpreter = (() => {
   const state = {
     variables: {},
     functions: {},
@@ -296,21 +296,10 @@ const shikigamiInterpreter = (() => {
   // Public execute API
   const execute = (code) => {
     try {
-      if (code.includes('FIZZBUZZ')) {
-        let maxNum = 20;
-        const match = code.match(/FIZZBUZZ\s*\(\s*(\d+)\s*\)/);
-        if (match) {
-          maxNum = Math.min(parseInt(match[1], 10), 1000);
-        }
-        const res = Array.from({ length: maxNum }, (_, i) => {
-          const n = i + 1;
-          if (n % 15 === 0) return 'FizzBuzz';
-          if (n % 3 === 0) return 'Fizz';
-          if (n % 5 === 0) return 'Buzz';
-          return n.toString();
-        });
-        return res.join(', ');
-      }
+      // クリーンアップ - 色指定の非表示空白コマンドを削除
+      // ここで不可視の色付け命令を取り除きます
+      code = code.replace(/\u200B\[(black|red|green|blue)\]/g, '');
+      
       const tokens = tokenize(code);
       const ast = parse(tokens);
       const result = evaluate(ast);
@@ -413,29 +402,89 @@ const focusOnInput = () => {
     }
 };
 
+// 色指定コマンドの生成 - ColorForth風
+const getColorCommand = (color) => {
+    // 不可視のゼロ幅スペース文字 + 色指定タグ
+    return `\u200B[${color}]`;
+};
+
+// 共通のカラーテキスト挿入関数
+const insertColoredText = (text, color) => {
+    const editor = elements.input;
+    if (!editor) return;
+    
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    
+    const range = selection.getRangeAt(0);
+    
+    // ColorForth風の色指定 + 空白スペース
+    if (text === ' ') {
+        // スペース要求の場合は色変更なし、通常の空白を挿入
+        const span = document.createElement('span');
+        span.textContent = ' ';
+        range.deleteContents();
+        range.insertNode(span);
+    } else if (text === '\n') {
+        // 改行要求の場合も色変更なし
+        const span = document.createElement('span');
+        span.textContent = '\n';
+        range.deleteContents();
+        range.insertNode(span);
+    } else {
+        // Create a colored span
+        const span = document.createElement('span');
+        span.style.color = color;
+        span.textContent = text;
+        
+        // Insert the span
+        range.deleteContents();
+        range.insertNode(span);
+    }
+    
+    // Move caret after the inserted span
+    range.collapse(false);
+    selection.removeAllRanges();
+    selection.addRange(range);
+};
+
+// 色変更コマンドの挿入（ColorForth風）
+const insertColorChange = (color) => {
+    const editor = elements.input;
+    if (!editor) return;
+    
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return;
+    
+    const range = selection.getRangeAt(0);
+    
+    // 不可視の色指定コマンド + 空白
+    const colorCommand = getColorCommand(color);
+    const span = document.createElement('span');
+    span.style.color = color;
+    span.textContent = ' '; // 空白で表示
+    span.dataset.colorCommand = colorCommand; // データ属性に保存
+    
+    // Insert the span
+    range.deleteContents();
+    range.insertNode(span);
+    
+    // Move caret after the inserted span
+    range.setStartAfter(span);
+    range.setEndAfter(span);
+    selection.removeAllRanges();
+    selection.addRange(range);
+};
+
 // Modified to work with contenteditable div instead of textarea
 const insertAtCursor = (text) => {
     const editor = elements.input;
     if (!editor) return;
     
-    const selection = window.getSelection();
-    if (selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        const currentColor = document.querySelector('.color-btn.active')?.dataset.color || 'black';
-        
-        const span = document.createElement('span');
-        span.style.color = currentColor;
-        span.textContent = text;
-        
-        range.deleteContents();
-        range.insertNode(span);
-        
-        // Move cursor after the inserted span
-        range.setStartAfter(span);
-        range.setEndAfter(span);
-        selection.removeAllRanges();
-        selection.addRange(range);
-    }
+    // Get the current active color
+    const currentActiveColor = document.querySelector('.color-btn.active')?.dataset.color || 'black';
+    
+    insertColoredText(text, currentActiveColor);
     
     if (isMobileDevice()) showTextSection();
     focusOnInput();
@@ -625,7 +674,9 @@ const startDrawing = (dotEl, x, y) => {
 };
 
 // --- Event Handlers ---
-// Updated for contenteditable div
+// 削除処理の修正 - トークンと空白の削除を適切に行う
+// 削除処理の修正 - トークンと空白の削除を適切に行う
+// 削除処理の修正 - 単一文字削除とトークン削除を両立させる
 const handleDeleteAction = (deleteToken = false) => {
     const editor = elements.input;
     if (!editor) return;
@@ -638,64 +689,123 @@ const handleDeleteAction = (deleteToken = false) => {
     if (range.collapsed) {
         // Cursor is collapsed (no selection)
         if (deleteToken) {
-            // Delete whole token/word
-            const newRange = range.cloneRange();
-            
-            // Get previous content up to cursor
+            // トークン削除モード
             const tempRange = document.createRange();
             tempRange.selectNodeContents(editor);
+            
+            // カーソル位置までのテキストを取得
             tempRange.setEnd(range.startContainer, range.startOffset);
             const contentBefore = tempRange.toString();
             
             if (!contentBefore.length) return;
             
-            let startPos = contentBefore.length;
+            // 現在のカーソル位置
+            let endPos = contentBefore.length;
+            // トークンの開始位置
+            let startPos = endPos;
+            let foundWord = false;
             
-            // Find start of the token
+            // トークンを見つける（空白文字が出るまで後ろから検索）
             while (startPos > 0) {
                 const char = contentBefore.charAt(startPos - 1);
                 if (char === ' ' || char === '\n') {
-                    break;
+                    // 空白を見つけた
+                    if (foundWord) {
+                        // すでに単語を見つけていれば、これが単語の先頭
+                        break;
+                    }
+                } else {
+                    // 文字を見つけた
+                    foundWord = true;
                 }
                 startPos--;
             }
             
-            // Calculate how many characters to delete
-            const charsToDelete = contentBefore.length - startPos;
+            // 前の空白も削除するため、さらに前を検索
+            let spaceStart = startPos;
+            while (spaceStart > 0) {
+                const char = contentBefore.charAt(spaceStart - 1);
+                if (char === ' ' || char === '\n') {
+                    // 空白文字なので削除範囲に含める
+                    spaceStart--;
+                } else {
+                    // 空白以外なので終了
+                    break;
+                }
+            }
             
-            if (charsToDelete > 0) {
-                // Create a range for deletion
-                newRange.setStart(range.startContainer, range.startOffset - charsToDelete);
-                newRange.setEnd(range.startContainer, range.startOffset);
-                newRange.deleteContents();
+            // 削除範囲を設定して実行
+            try {
+                const deleteRange = range.cloneRange();
+                
+                // カーソル位置を削除範囲の先頭に移動
+                deleteRange.setStart(range.startContainer, range.startOffset - (endPos - spaceStart));
+                
+                // 範囲を削除
+                deleteRange.deleteContents();
+                
+                // 選択範囲を更新
+                selection.removeAllRanges();
+                selection.addRange(deleteRange);
+            } catch (e) {
+                // DOMの範囲外などのエラーが発生した場合に、より正確な方法を試みる
+                // 単純に内容を書き換える
+                let newText = contentBefore.substring(0, spaceStart) + contentBefore.substring(endPos);
+                editor.textContent = newText + (editor.textContent.substring(contentBefore.length) || '');
+                
+                // カーソル位置を削除した位置に設定
+                const newRange = document.createRange();
+                const textNode = editor.firstChild || editor;
+                newRange.setStart(textNode, spaceStart);
+                newRange.collapse(true);
+                selection.removeAllRanges();
+                selection.addRange(newRange);
             }
         } else {
-            // Just delete one character
+            // 一文字だけ削除
             if (range.startOffset > 0) {
-                // If we're in a text node, just move back one character
+                // テキストノード内にいる場合は単純に前に移動
                 if (range.startContainer.nodeType === Node.TEXT_NODE) {
-                    range.setStart(range.startContainer, range.startOffset - 1);
+                    const deleteRange = range.cloneRange();
+                    deleteRange.setStart(range.startContainer, range.startOffset - 1);
+                    deleteRange.deleteContents();
+                    
+                    // カーソル位置を更新
+                    selection.removeAllRanges();
+                    selection.addRange(deleteRange);
                 } else {
-                    // We're at the start of an element, need to find the previous text node
-                    // This is simplified and may not handle all edge cases
+                    // 他の要素間の場合は前の要素を探す
                     const prevNode = range.startContainer.childNodes[range.startOffset - 1];
                     if (prevNode) {
                         if (prevNode.nodeType === Node.TEXT_NODE) {
-                            range.setStart(prevNode, prevNode.length - 1);
+                            const deleteRange = range.cloneRange();
+                            deleteRange.setStart(prevNode, prevNode.length - 1);
+                            deleteRange.setEnd(prevNode, prevNode.length);
+                            deleteRange.deleteContents();
+                            
+                            // カーソル位置を更新
+                            selection.removeAllRanges();
+                            selection.addRange(deleteRange);
                         } else {
-                            // Complex case, find the last text node inside this element
+                            // 複雑なケース、最後のテキストノードを探す
                             const lastTextNode = findLastTextNode(prevNode);
                             if (lastTextNode) {
-                                range.setStart(lastTextNode, lastTextNode.length - 1);
+                                const deleteRange = range.cloneRange();
+                                deleteRange.setStart(lastTextNode, lastTextNode.length - 1);
+                                deleteRange.setEnd(lastTextNode, lastTextNode.length);
+                                deleteRange.deleteContents();
+                                
+                                // カーソル位置を更新
+                                selection.removeAllRanges();
+                                selection.addRange(deleteRange);
                             }
                         }
                     }
                 }
-                range.deleteContents();
             }
         }
     } else {
-        // There's a selection, just delete it
+        // 選択範囲がある場合はそのまま削除
         range.deleteContents();
     }
     
@@ -721,21 +831,21 @@ const executeCode = () => {
     const code = editor ? editor.textContent || editor.innerText : '';
     
     if (!code.trim()) return;
-    let isShikigamiSuccess = false;
+    let isSuccess = false;
     try {
-        // 式神コードを実行
-        const result = shikigamiInterpreter.execute(code);
+        // コードを実行
+        const result = interpreter.execute(code);
         const resultString = result !== undefined ? String(result) : "実行完了";
         
         if (typeof resultString === 'string' && resultString.startsWith("エラー:")) {
-            // shikigami言語レベルのエラーが返ってきた場合
-            isShikigamiSuccess = false;
+            // 言語レベルのエラーが返ってきた場合
+            isSuccess = false;
             if (elements.output) {
                 elements.output.value = resultString;
             }
         } else {
-            // shikigami言語レベルで成功した場合
-            isShikigamiSuccess = true;
+            // 言語レベルで成功した場合
+            isSuccess = true;
             if (elements.output) {
                 elements.output.value = resultString;
                 elements.output.classList.add('executed');
@@ -745,13 +855,13 @@ const executeCode = () => {
         // outputセクションを表示 (エラーでも成功でも表示)
         showOutputSection();
         // 成功した場合のみ、入力エリアをクリア
-        if (isShikigamiSuccess && editor) {
+        if (isSuccess && editor) {
             editor.innerHTML = '';
         }
         focusOnInput();
     } catch (err) {
         // JavaScriptレベルのエラー
-        isShikigamiSuccess = false;
+        isSuccess = false;
         if (elements.output) {
             elements.output.value = `致命的なエラー: ${err.message}`;
         }
@@ -760,9 +870,7 @@ const executeCode = () => {
     }
 };
 
-
-		
-		const handleSpecialButtonClick = (e, type, actions) => {
+const handleSpecialButtonClick = (e, type, actions) => {
     if (e && e.preventDefault) e.preventDefault();
     const now = Date.now();
     if (specialButtonState.clickTarget === type &&
@@ -965,9 +1073,10 @@ const setupSpecialButtonListeners = () => {
     }
 
     if (spaceBtn) {
+        // ColorForth風の仕様に変更：単一クリックで改行、ダブルクリックは使わない
         spaceBtn.addEventListener('pointerup', e => handleSpecialButtonClick(e, 'space', {
-            single: () => insertAtCursor(' '),
-            double: () => insertAtCursor('\n')
+            single: () => insertAtCursor('\n'),
+            double: () => insertAtCursor('\n')  // ダブルクリックも同じ動作
         }));
         spaceBtn.addEventListener('pointerdown', e => e.preventDefault());
     }
@@ -1142,9 +1251,11 @@ function initKeypad() {
 
     const spaceBtn = document.createElement('div');
     spaceBtn.className = 'special-button space';
-    spaceBtn.textContent = '空白';
+    // ボタンのテキストを「改行」に変更
+    spaceBtn.textContent = '改行';
     spaceBtn.dataset.action = 'space';
-    spaceBtn.title = '空白 (ダブルタップで改行)';
+    // ヒントテキストも変更
+    spaceBtn.title = '改行を挿入';
     elements.specialRow.appendChild(spaceBtn);
 
     if (elements.d2dArea) elements.d2dArea.tabIndex = -1;
@@ -1194,7 +1305,7 @@ const initRichTextEditor = () => {
     // Set initial caret color
     editor.style.caretColor = currentColor;
     
-    // Apply color function
+    // Apply color function - ColorForth風に修正
     const applyColor = (color) => {
         currentColor = color;
         
@@ -1205,6 +1316,9 @@ const initRichTextEditor = () => {
         
         // Set caret color
         editor.style.caretColor = color;
+        
+        // ColorForth風 - 色変更は空白を意味する
+        insertColorChange(color);
         
         // Focus back on editor
         editor.focus();
@@ -1239,29 +1353,6 @@ const initRichTextEditor = () => {
         insertColoredText(char, currentColor);
     });
     
-    // Function to insert colored text at current selection
-    const insertColoredText = (text, color) => {
-        const selection = window.getSelection();
-        if (!selection.rangeCount) return;
-        
-        const range = selection.getRangeAt(0);
-        
-        // Create a colored span
-        const span = document.createElement('span');
-        span.style.color = color;
-        span.textContent = text;
-        
-        // Insert the span
-        range.deleteContents();
-        range.insertNode(span);
-        
-        // Move caret after the inserted span
-        range.setStartAfter(span);
-        range.setEndAfter(span);
-        selection.removeAllRanges();
-        selection.addRange(range);
-    };
-    
     // Handle paste events to preserve color
     editor.addEventListener('paste', (e) => {
         e.preventDefault();
@@ -1272,20 +1363,6 @@ const initRichTextEditor = () => {
         // Insert with current color
         insertColoredText(text, currentColor);
     });
-    
-    // Make insertAtCursor use the insertColoredText function
-// 正しく動作するようwindow.insertAtCursor関数を定義
-window.insertAtCursor = (text) => {
-    if (!editor) return;
-    
-    // アクティブな色を取得
-    const currentActiveColor = document.querySelector('.color-btn.active')?.dataset.color || 'black';
-    
-    insertColoredText(text, currentActiveColor);
-    
-    if (isMobileDevice()) showTextSection();
-    focusOnInput();
-};
     
     // Initial focus
     focusOnInput();
