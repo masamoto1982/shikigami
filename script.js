@@ -82,13 +82,9 @@ const interpreter = (() => {
     functions: {},
   };
 
-  // Tokenizer: now strips any `: type` segments so existing code with type annotations still runs
   const tokenize = (code) => {
-    // Remove in‑line comments
     code = code.replace(/#.*$/gm, '');
-    // *** NEW *** Strip type annotations like ": number", ": string", etc.
     code = code.replace(/\s*:\s*[a-zA-Z_]+\b/g, '');
-    // Temporarily encode fractional literals (e.g. 3/4 → 3_FRAC_4)
     code = code.replace(/(\d+)\/(\d+)/g, '$1_FRAC_$2');
 
     const tokens = [];
@@ -125,18 +121,16 @@ const interpreter = (() => {
           tokens.push(current.trim());
           current = '';
         }
-        if (char !== ':') tokens.push(char); // skip ':' entirely
+        if (char !== ':') tokens.push(char);
       } else {
         current += char;
       }
     }
     if (current.trim()) tokens.push(current.trim());
 
-    // Decode fractional placeholders back to normal form
     return tokens.map((t) => (t.includes('_FRAC_') ? t.replace('_FRAC_', '/') : t)).filter((t) => t.trim() !== '');
   };
 
-  // --- Parser & Evaluator (unchanged – relies on tokens already cleansed of types) ---
   const parse = (tokens) => {
     const parseExpression = (index) => {
       if (index >= tokens.length) throw new Error('Unexpected end of input');
@@ -156,7 +150,6 @@ const interpreter = (() => {
         return { type: 'string', value: token.slice(1, -1), nextIndex: index + 1 };
       }
       if (/^[A-Z][A-Z0-9_]*$/.test(token)) {
-        // Function call with parentheses
         if (tokens[index + 1] === '(') {
           let paramIndex = index + 2;
           const args = [];
@@ -169,7 +162,6 @@ const interpreter = (() => {
           if (tokens[paramIndex] !== ')') throw new Error('Expected ) after function arguments');
           return { type: 'function_call', name: token, arguments: args, nextIndex: paramIndex + 1 };
         }
-        // Function call without parentheses (Polish notation)
         if (state.functions[token] && index + 1 < tokens.length) {
           const { params } = state.functions[token];
           if (params.length) {
@@ -185,13 +177,11 @@ const interpreter = (() => {
         }
         return { type: 'variable', name: token, nextIndex: index + 1 };
       }
-      // Operators (prefix notation)
       if (['+', '-', '*', '/', '>', '>=', '==', '='].includes(token)) {
         if (token === '=') {
           if (index + 2 >= tokens.length) throw new Error('Invalid assignment expression');
           const varName = tokens[index + 1];
 
-          // Function definition
           if (tokens[index + 2] === '(' && /^[A-Z][A-Z0-9_]*$/.test(varName)) {
             let paramIndex = index + 3;
             const params = [];
@@ -206,11 +196,9 @@ const interpreter = (() => {
             state.functions[varName] = { params, body: bodyExpr };
             return { type: 'function_definition', name: varName, params, body: bodyExpr, nextIndex: bodyExpr.nextIndex };
           }
-          // Simple variable assignment
           const valueExpr = parseExpression(index + 2);
           return { type: 'assignment', variable: varName, value: valueExpr, nextIndex: valueExpr.nextIndex };
         }
-        // Binary operation
         const left = parseExpression(index + 1);
         const right = parseExpression(left.nextIndex);
         return { type: 'operation', operator: token, left, right, nextIndex: right.nextIndex };
@@ -293,11 +281,8 @@ const interpreter = (() => {
     return result;
   };
 
-  // Public execute API
   const execute = (code) => {
     try {
-      // クリーンアップ - 色指定の非表示空白コマンドを削除
-      // ここで不可視の色付け命令を取り除きます
       code = code.replace(/\u200B\[(black|red|green|blue)\]/g, '');
       
       const tokens = tokenize(code);
@@ -312,7 +297,6 @@ const interpreter = (() => {
   return { ...state, tokenize, parse, evaluate, execute };
 })();
 
-// --- Configuration Parameters ---
 const CONFIG = {
     sensitivity: {
         hitRadius: 15,
@@ -342,7 +326,6 @@ const CONFIG = {
     }
 };
 
-// --- DOM Elements (Constants) ---
 const elements = {
     dotGrid: document.getElementById('dot-grid'),
     specialRow: document.getElementById('special-row'),
@@ -356,7 +339,6 @@ const elements = {
     textSection: document.getElementById('text-section')
 };
 
-// --- Gesture State (Mutable) ---
 const drawState = {
     isActive: false,
     detectedDots: new Set(),
@@ -391,7 +373,6 @@ const keyState = {
     maxTimeDiff: 300
 };
 
-// --- Utility Functions ---
 const isMobileDevice = () => {
     return ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || /Mobi|Android/i.test(navigator.userAgent);
 };
@@ -402,86 +383,107 @@ const focusOnInput = () => {
     }
 };
 
-// 色指定コマンドの生成 - ColorForth風
 const getColorCommand = (color) => {
-    // 不可視のゼロ幅スペース文字 + 色指定タグ
     return `\u200B[${color}]`;
 };
 
-// 共通のカラーテキスト挿入関数
+// カーソル位置を取得するヘルパー関数
+const getCursorPosition = (element) => {
+    const selection = window.getSelection();
+    if (!selection.rangeCount) return 0;
+    
+    const range = selection.getRangeAt(0);
+    const preCaretRange = range.cloneRange();
+    preCaretRange.selectNodeContents(element);
+    preCaretRange.setEnd(range.endContainer, range.endOffset);
+    return preCaretRange.toString().length;
+};
+
+// カーソル位置を設定するヘルパー関数
+const setCursorPosition = (element, position) => {
+    let charIndex = 0;
+    let foundPosition = false;
+    
+    const traverseNodes = (node) => {
+        if (foundPosition) return;
+        
+        if (node.nodeType === Node.TEXT_NODE) {
+            const nodeLength = node.length;
+            if (charIndex + nodeLength >= position) {
+                const range = document.createRange();
+                const selection = window.getSelection();
+                
+                range.setStart(node, position - charIndex);
+                range.collapse(true);
+                
+                selection.removeAllRanges();
+                selection.addRange(range);
+                
+                foundPosition = true;
+            }
+            charIndex += nodeLength;
+        } else {
+            for (let i = 0; i < node.childNodes.length && !foundPosition; i++) {
+                traverseNodes(node.childNodes[i]);
+            }
+        }
+    };
+    
+    traverseNodes(element);
+    
+    // 位置が見つからなかった場合はエディタの最後にカーソルを設定
+    if (!foundPosition) {
+        const range = document.createRange();
+        const selection = window.getSelection();
+        
+        if (element.lastChild) {
+            if (element.lastChild.nodeType === Node.TEXT_NODE) {
+                range.setStart(element.lastChild, element.lastChild.length);
+            } else {
+                range.setStartAfter(element.lastChild);
+            }
+        } else {
+            range.setStart(element, 0);
+        }
+        
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+};
+
 const insertColoredText = (text, color) => {
     const editor = elements.input;
     if (!editor) return;
     
-    const selection = window.getSelection();
-    if (!selection.rangeCount) return;
+    // エディタにフォーカスを当てる
+    editor.focus();
     
-    const range = selection.getRangeAt(0);
-    
-    // ColorForth風の色指定 + 空白スペース
-    if (text === ' ') {
-        // スペース要求の場合は色変更なし、通常の空白を挿入
-        const span = document.createElement('span');
-        span.textContent = ' ';
-        range.deleteContents();
-        range.insertNode(span);
-    } else if (text === '\n') {
-        // 改行要求の場合も色変更なし
-        const span = document.createElement('span');
-        span.textContent = '\n';
-        range.deleteContents();
-        range.insertNode(span);
+    if (text === '\n') {
+        // 改行の挿入 - <br>タグを使用
+        document.execCommand('insertHTML', false, '<br>');
     } else {
-        // Create a colored span
-        const span = document.createElement('span');
-        span.style.color = color;
-        span.textContent = text;
-        
-        // Insert the span
-        range.deleteContents();
-        range.insertNode(span);
+        // 通常のテキスト挿入 - 色を適用して挿入
+        document.execCommand('styleWithCSS', false, true);
+        document.execCommand('foreColor', false, color);
+        document.execCommand('insertText', false, text);
     }
-    
-    // Move caret after the inserted span
-    range.collapse(false);
-    selection.removeAllRanges();
-    selection.addRange(range);
 };
 
-// 色変更コマンドの挿入（ColorForth風）
 const insertColorChange = (color) => {
     const editor = elements.input;
     if (!editor) return;
     
-    const selection = window.getSelection();
-    if (!selection.rangeCount) return;
-    
-    const range = selection.getRangeAt(0);
-    
-    // 不可視の色指定コマンド + 空白
-    const colorCommand = getColorCommand(color);
-    const span = document.createElement('span');
-    span.style.color = color;
-    span.textContent = ' '; // 空白で表示
-    span.dataset.colorCommand = colorCommand; // データ属性に保存
-    
-    // Insert the span
-    range.deleteContents();
-    range.insertNode(span);
-    
-    // Move caret after the inserted span
-    range.setStartAfter(span);
-    range.setEndAfter(span);
-    selection.removeAllRanges();
-    selection.addRange(range);
+    // 色を変更し、空白を挿入
+    document.execCommand('styleWithCSS', false, true);
+    document.execCommand('foreColor', false, color);
+    document.execCommand('insertText', false, ' ');
 };
 
-// Modified to work with contenteditable div instead of textarea
 const insertAtCursor = (text) => {
     const editor = elements.input;
     if (!editor) return;
     
-    // Get the current active color
     const currentActiveColor = document.querySelector('.color-btn.active')?.dataset.color || 'black';
     
     insertColoredText(text, currentActiveColor);
@@ -490,7 +492,6 @@ const insertAtCursor = (text) => {
     focusOnInput();
 };
 
-// Updated for contenteditable div
 const clearInput = () => {
     if (elements.input) {
         elements.input.innerHTML = '';
@@ -513,7 +514,6 @@ const showOutputSection = () => {
     }
 };
 
-// --- Canvas Drawing Functions ---
 const clearCanvas = () => {
     const lineCtx = elements.lineCanvas ? elements.lineCanvas.getContext('2d') : null;
     if (lineCtx && elements.lineCanvas) {
@@ -521,7 +521,6 @@ const clearCanvas = () => {
     }
 };
 
-// --- Gesture Logic Functions ---
 const resetDrawState = (keepActive = false) => {
     drawState.isActive = keepActive;
     if (drawState.detectedDots.size > 0) {
@@ -538,25 +537,21 @@ const resetDrawState = (keepActive = false) => {
 };
 
 const recognizeLetter = (totalValue) => {
-    // 1. 完全一致チェック
     if (letterPatterns.hasOwnProperty(totalValue)) {
         console.log(`認識成功 (完全一致): 値=${totalValue}, 文字=${letterPatterns[totalValue]}`);
         return letterPatterns[totalValue];
     }
 
-    // 2. 寛容性チェック (tolerance > 0 の場合)
     if (CONFIG.recognition.tolerance > 0 && totalValue > 0) {
         let bestMatch = null;
 
         for (const patternValueStr in letterPatterns) {
             const patternValue = parseInt(patternValueStr, 10);
-            const diff = totalValue ^ patternValue; // XORで差分ビットを計算
+            const diff = totalValue ^ patternValue;
 
-            // 差分が2のべき乗かチェック (ビットが1つだけ立っているか)
             const isPowerOfTwo = (diff > 0) && ((diff & (diff - 1)) === 0);
 
             if (isPowerOfTwo) {
-                // tolerance = 1 の場合、最初に見つかったものを採用
                 if (CONFIG.recognition.tolerance === 1) {
                     console.log(`認識成功 (寛容性): 入力=${totalValue}, パターン=${patternValue}, 文字=${letterPatterns[patternValue]}, 差分=${diff}`);
                     bestMatch = letterPatterns[patternValue];
@@ -569,7 +564,6 @@ const recognizeLetter = (totalValue) => {
         }
     }
 
-    // 一致なし
     console.log(`認識失敗: 値=${totalValue}`);
     return null;
 };
@@ -673,147 +667,93 @@ const startDrawing = (dotEl, x, y) => {
     drawState.strokeTimer = null;
 };
 
-// --- Event Handlers ---
-// 削除処理の修正 - トークンと空白の削除を適切に行う
-// 削除処理の修正 - トークンと空白の削除を適切に行う
-// 削除処理の修正 - 単一文字削除とトークン削除を両立させる
+// 削除処理 - 単純化版
 const handleDeleteAction = (deleteToken = false) => {
     const editor = elements.input;
     if (!editor) return;
     
-    const selection = window.getSelection();
-    if (!selection.rangeCount) return;
-    
-    const range = selection.getRangeAt(0);
-    
-    if (range.collapsed) {
-        // Cursor is collapsed (no selection)
-        if (deleteToken) {
-            // トークン削除モード
-            const tempRange = document.createRange();
-            tempRange.selectNodeContents(editor);
-            
-            // カーソル位置までのテキストを取得
-            tempRange.setEnd(range.startContainer, range.startOffset);
-            const contentBefore = tempRange.toString();
-            
-            if (!contentBefore.length) return;
-            
-            // 現在のカーソル位置
-            let endPos = contentBefore.length;
-            // トークンの開始位置
-            let startPos = endPos;
-            let foundWord = false;
-            
-            // トークンを見つける（空白文字が出るまで後ろから検索）
-            while (startPos > 0) {
-                const char = contentBefore.charAt(startPos - 1);
-                if (char === ' ' || char === '\n') {
-                    // 空白を見つけた
-                    if (foundWord) {
-                        // すでに単語を見つけていれば、これが単語の先頭
-                        break;
-                    }
-                } else {
-                    // 文字を見つけた
-                    foundWord = true;
-                }
-                startPos--;
+    if (deleteToken) {
+        // トークン削除モード
+        const selection = window.getSelection();
+        if (!selection.rangeCount) return;
+        
+        // 現在のカーソル位置を取得
+        const cursorPosition = getCursorPosition(editor);
+        if (cursorPosition === 0) return;
+        
+        // テキスト全体を取得
+        const fullText = editor.textContent || '';
+        
+        // トークンの範囲を見つける
+        let tokenStart = cursorPosition;
+        let foundWord = false;
+        
+        while (tokenStart > 0) {
+            const char = fullText.charAt(tokenStart - 1);
+            if (char === ' ' || char === '\n') {
+                if (foundWord) break;
+            } else {
+                foundWord = true;
             }
-            
-            // 前の空白も削除するため、さらに前を検索
-            let spaceStart = startPos;
-            while (spaceStart > 0) {
-                const char = contentBefore.charAt(spaceStart - 1);
-                if (char === ' ' || char === '\n') {
-                    // 空白文字なので削除範囲に含める
-                    spaceStart--;
-                } else {
-                    // 空白以外なので終了
-                    break;
-                }
-            }
-            
-            // 削除範囲を設定して実行
-            try {
-                const deleteRange = range.cloneRange();
-                
-                // カーソル位置を削除範囲の先頭に移動
-                deleteRange.setStart(range.startContainer, range.startOffset - (endPos - spaceStart));
-                
-                // 範囲を削除
-                deleteRange.deleteContents();
-                
-                // 選択範囲を更新
-                selection.removeAllRanges();
-                selection.addRange(deleteRange);
-            } catch (e) {
-                // DOMの範囲外などのエラーが発生した場合に、より正確な方法を試みる
-                // 単純に内容を書き換える
-                let newText = contentBefore.substring(0, spaceStart) + contentBefore.substring(endPos);
-                editor.textContent = newText + (editor.textContent.substring(contentBefore.length) || '');
-                
-                // カーソル位置を削除した位置に設定
-                const newRange = document.createRange();
-                const textNode = editor.firstChild || editor;
-                newRange.setStart(textNode, spaceStart);
-                newRange.collapse(true);
-                selection.removeAllRanges();
-                selection.addRange(newRange);
-            }
-        } else {
-            // 一文字だけ削除
-            if (range.startOffset > 0) {
-                // テキストノード内にいる場合は単純に前に移動
-                if (range.startContainer.nodeType === Node.TEXT_NODE) {
-                    const deleteRange = range.cloneRange();
-                    deleteRange.setStart(range.startContainer, range.startOffset - 1);
-                    deleteRange.deleteContents();
-                    
-                    // カーソル位置を更新
-                    selection.removeAllRanges();
-                    selection.addRange(deleteRange);
-                } else {
-                    // 他の要素間の場合は前の要素を探す
-                    const prevNode = range.startContainer.childNodes[range.startOffset - 1];
-                    if (prevNode) {
-                        if (prevNode.nodeType === Node.TEXT_NODE) {
-                            const deleteRange = range.cloneRange();
-                            deleteRange.setStart(prevNode, prevNode.length - 1);
-                            deleteRange.setEnd(prevNode, prevNode.length);
-                            deleteRange.deleteContents();
-                            
-                            // カーソル位置を更新
-                            selection.removeAllRanges();
-                            selection.addRange(deleteRange);
-                        } else {
-                            // 複雑なケース、最後のテキストノードを探す
-                            const lastTextNode = findLastTextNode(prevNode);
-                            if (lastTextNode) {
-                                const deleteRange = range.cloneRange();
-                                deleteRange.setStart(lastTextNode, lastTextNode.length - 1);
-                                deleteRange.setEnd(lastTextNode, lastTextNode.length);
-                                deleteRange.deleteContents();
-                                
-                                // カーソル位置を更新
-                                selection.removeAllRanges();
-                                selection.addRange(deleteRange);
-                            }
-                        }
-                    }
-                }
+            tokenStart--;
+        }
+        
+        // 直前の空白も削除
+        let spaceStart = tokenStart;
+        while (spaceStart > 0) {
+            const char = fullText.charAt(spaceStart - 1);
+            if (char === ' ' || char === '\n') {
+                spaceStart--;
+            } else {
+                break;
             }
         }
+        
+        // 削除範囲の選択
+        const range = selection.getRangeAt(0);
+        const startNode = editor.firstChild;
+        
+        if (startNode) {
+            // カーソル位置から削除範囲の分だけ戻る
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            
+            // テキストノードを探索して範囲を設定
+            let currentPos = 0;
+            const setRange = (node) => {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    const nodeLength = node.length;
+                    if (currentPos <= spaceStart && spaceStart < currentPos + nodeLength) {
+                        // 削除開始位置
+                        range.setStart(node, spaceStart - currentPos);
+                    }
+                    if (currentPos <= cursorPosition && cursorPosition <= currentPos + nodeLength) {
+                        // 削除終了位置
+                        range.setEnd(node, cursorPosition - currentPos);
+                        return true;
+                    }
+                    currentPos += nodeLength;
+                } else {
+                    for (let i = 0; i < node.childNodes.length; i++) {
+                        if (setRange(node.childNodes[i])) return true;
+                    }
+                }
+                return false;
+            };
+            
+            setRange(editor);
+            selection.addRange(range);
+            document.execCommand('delete', false);
+        }
     } else {
-        // 選択範囲がある場合はそのまま削除
-        range.deleteContents();
+        // 一文字削除 - シンプルにdomの削除機能を使用
+        document.execCommand('delete', false);
     }
     
-    if (isMobileDevice()) showTextSection();
     focusOnInput();
+    if (isMobileDevice()) showTextSection();
 };
 
-// Helper function to find the last text node in an element
 const findLastTextNode = (element) => {
     if (element.nodeType === Node.TEXT_NODE) return element;
     
@@ -826,25 +766,21 @@ const findLastTextNode = (element) => {
 };
 
 const executeCode = () => {
-    // Get plain text from the rich text editor
     const editor = elements.input;
     const code = editor ? editor.textContent || editor.innerText : '';
     
     if (!code.trim()) return;
     let isSuccess = false;
     try {
-        // コードを実行
         const result = interpreter.execute(code);
         const resultString = result !== undefined ? String(result) : "実行完了";
         
         if (typeof resultString === 'string' && resultString.startsWith("エラー:")) {
-            // 言語レベルのエラーが返ってきた場合
             isSuccess = false;
             if (elements.output) {
                 elements.output.value = resultString;
             }
         } else {
-            // 言語レベルで成功した場合
             isSuccess = true;
             if (elements.output) {
                 elements.output.value = resultString;
@@ -852,15 +788,12 @@ const executeCode = () => {
                 setTimeout(() => elements.output.classList.remove('executed'), 300);
             }
         }
-        // outputセクションを表示 (エラーでも成功でも表示)
         showOutputSection();
-        // 成功した場合のみ、入力エリアをクリア
         if (isSuccess && editor) {
             editor.innerHTML = '';
         }
         focusOnInput();
     } catch (err) {
-        // JavaScriptレベルのエラー
         isSuccess = false;
         if (elements.output) {
             elements.output.value = `致命的なエラー: ${err.message}`;
@@ -870,9 +803,12 @@ const executeCode = () => {
     }
 };
 
+// 特殊ボタンのイベントリスナー設定 - シンプル化
 const handleSpecialButtonClick = (e, type, actions) => {
     if (e && e.preventDefault) e.preventDefault();
     const now = Date.now();
+    
+    // ダブルクリック検出
     if (specialButtonState.clickTarget === type &&
         now - specialButtonState.lastClickTime < specialButtonState.doubleClickDelay) {
         clearTimeout(specialButtonState.clickTimer);
@@ -881,6 +817,7 @@ const handleSpecialButtonClick = (e, type, actions) => {
         specialButtonState.clickTimer = null;
         if (actions.double) actions.double();
     } else {
+        // シングルクリック処理
         specialButtonState.clickCount = 1;
         specialButtonState.lastClickTime = now;
         specialButtonState.clickTarget = type;
@@ -1042,7 +979,6 @@ const handlePointerUp = (e) => {
     focusOnInput();
 };
 
-// マルチタッチサポートのためのイベントリスナー
 const setupMultiTouchSupport = () => {
     if (isMobileDevice() && elements.d2dArea) {
         elements.d2dArea.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
@@ -1050,7 +986,6 @@ const setupMultiTouchSupport = () => {
     }
 };
 
-// --- Event Listener Setup ---
 const setupDotEventListeners = () => {
     if (!elements.d2dArea) return;
     elements.d2dArea.addEventListener('pointerdown', (e) => {
@@ -1060,11 +995,13 @@ const setupDotEventListeners = () => {
     }, { passive: false });
 };
 
+// 改行ボタンのイベントリスナーだけを修正
 const setupSpecialButtonListeners = () => {
     const deleteBtn = elements.specialRow ? elements.specialRow.querySelector('[data-action="delete"]') : null;
     const spaceBtn = elements.specialRow ? elements.specialRow.querySelector('[data-action="space"]') : null;
 
     if (deleteBtn) {
+        // 削除ボタンの処理はそのまま
         deleteBtn.addEventListener('pointerup', e => handleSpecialButtonClick(e, 'delete', {
             single: () => handleDeleteAction(false),
             double: () => handleDeleteAction(true)
@@ -1073,13 +1010,18 @@ const setupSpecialButtonListeners = () => {
     }
 
     if (spaceBtn) {
-        // ColorForth風の仕様に変更：単一クリックで改行、ダブルクリックは使わない
-        spaceBtn.addEventListener('pointerup', e => handleSpecialButtonClick(e, 'space', {
-            single: () => insertAtCursor('\n'),
-            double: () => insertAtCursor('\n')  // ダブルクリックも同じ動作
-        }));
-        spaceBtn.addEventListener('pointerdown', e => e.preventDefault());
-    }
+    // 改行ボタンの処理を変更
+    spaceBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const editor = elements.input;
+        if (editor) {
+            // 直接改行を挿入
+            document.execCommand('insertHTML', false, '<br>');
+            editor.focus();
+        }
+    });
+}
+
 };
 
 const setupExecuteButtonListener = () => {
@@ -1119,7 +1061,6 @@ const setupGestureListeners = () => {
     document.addEventListener('pointercancel', handlePointerUp, { passive: false });
 };
 
-// 動的なスタイル設定（CONFIGに依存する部分のみ）
 const updateConfigStyles = () => {
     const existing = document.getElementById('dynamic-config-styles');
     if (existing) existing.remove();
@@ -1159,7 +1100,6 @@ const updateConfigStyles = () => {
     document.head.appendChild(s);
 };
 
-// --- ドット配置の設定 ---
 const dotValues = [
     1, 2, 4, 8, 16, 32, 64, 128, 256, 512,
     1024, 2048, 4096, 8192, 16384, 32768,
@@ -1190,7 +1130,6 @@ const dotWordMapping = {
     2097152: '>', 8388608: '='
 };
 
-// --- Keypad Initialization ---
 function initKeypad() {
     if (!elements.dotGrid || !elements.specialRow) {
         console.error("Required grid elements not found!");
@@ -1200,7 +1139,6 @@ function initKeypad() {
     elements.dotGrid.innerHTML = '';
     elements.specialRow.innerHTML = '';
 
-    // Grid Rows and Dots
     for (let r = 0; r < CONFIG.layout.gridRows; r++) {
         const row = document.createElement('div');
         row.className = 'dot-row';
@@ -1233,7 +1171,6 @@ function initKeypad() {
         elements.dotGrid.appendChild(row);
     }
 
-    // Special Row Buttons
     const deleteBtn = document.createElement('div');
     deleteBtn.className = 'special-button delete';
     deleteBtn.textContent = '削除';
@@ -1249,14 +1186,20 @@ function initKeypad() {
     zeroBtn.dataset.value = '0';
     elements.specialRow.appendChild(zeroBtn);
 
-    const spaceBtn = document.createElement('div');
-    spaceBtn.className = 'special-button space';
-    // ボタンのテキストを「改行」に変更
-    spaceBtn.textContent = '改行';
-    spaceBtn.dataset.action = 'space';
-    // ヒントテキストも変更
-    spaceBtn.title = '改行を挿入';
-    elements.specialRow.appendChild(spaceBtn);
+// initKeypad内の改行ボタン作成部分
+const spaceBtn = document.createElement('div');
+spaceBtn.className = 'special-button space';
+spaceBtn.textContent = '改行';
+spaceBtn.dataset.action = 'space';
+spaceBtn.title = '改行を挿入';
+// 直接イベントハンドラを追加
+spaceBtn.onclick = (e) => {
+    e.preventDefault();
+    document.execCommand('insertHTML', false, '<br>');
+    focusOnInput();
+};
+
+elements.specialRow.appendChild(spaceBtn);
 
     if (elements.d2dArea) elements.d2dArea.tabIndex = -1;
 
@@ -1273,13 +1216,11 @@ const initResponsiveLayout = () => {
     const checkLayout = () => {
         resizeCanvas();
         if (isMobileDevice()) {
-            // モバイル時はデフォルトでText Sectionを表示
             if (elements.textSection && elements.outputSection) {
                 elements.outputSection.classList.add('hide');
                 elements.textSection.classList.remove('hide');
             }
         } else {
-            // デスクトップでは両方表示
             if (elements.outputSection) elements.outputSection.classList.remove('hide');
             if (elements.textSection) elements.textSection.classList.remove('hide');
         }
@@ -1290,94 +1231,72 @@ const initResponsiveLayout = () => {
     checkLayout();
 };
 
-// --- Rich text editor functionality ---
 const initRichTextEditor = () => {
     const editor = document.getElementById('txt-input');
     
     if (!editor) return;
     
-    // Current active color
     let currentColor = 'black';
     
-    // Color buttons
     const colorButtons = document.querySelectorAll('.color-btn');
     
-    // Set initial caret color
     editor.style.caretColor = currentColor;
     
-    // Apply color function - ColorForth風に修正
     const applyColor = (color) => {
         currentColor = color;
         
-        // Update active button
         colorButtons.forEach(btn => {
             btn.classList.toggle('active', btn.dataset.color === color);
         });
         
-        // Set caret color
         editor.style.caretColor = color;
         
-        // ColorForth風 - 色変更は空白を意味する
         insertColorChange(color);
         
-        // Focus back on editor
         editor.focus();
     };
     
-    // Handle color button clicks
     colorButtons.forEach(btn => {
         btn.addEventListener('click', () => {
             applyColor(btn.dataset.color);
         });
     });
     
-    // Handle keydown events for text insertion
     editor.addEventListener('keydown', (e) => {
-        // Skip for special keys (arrows, etc)
         if (e.key.length !== 1 && !['Enter', 'Tab'].includes(e.key)) return;
         
-        // Skip for key combos (Ctrl+V, etc)
         if (e.ctrlKey || e.metaKey) return;
         
-        // Prevent default for normal character input and handle manually
         e.preventDefault();
         
         if (e.key === 'Tab') {
-            // Insert a tab (4 spaces)
             insertColoredText('    ', currentColor);
             return;
         }
         
-        // Insert the character with current color
         const char = e.key === 'Enter' ? '\n' : e.key;
         insertColoredText(char, currentColor);
     });
     
-    // Handle paste events to preserve color
     editor.addEventListener('paste', (e) => {
         e.preventDefault();
         
-        // Get text content from clipboard
         const text = e.clipboardData.getData('text/plain');
         
-        // Insert with current color
         insertColoredText(text, currentColor);
     });
     
-    // Initial focus
     focusOnInput();
     
-    // Set black as the initial active color
     document.getElementById('color-black').classList.add('active');
 };
 
-// --- Initialization on load ---
 window.addEventListener('DOMContentLoaded', () => {
     initKeypad();
     initResponsiveLayout();
     setupExecuteButtonListener();
     setupClearButtonListener();
     setupKeyboardHandlers();
-    initRichTextEditor(); // リッチテキストエディタを初期化
+    initRichTextEditor();
     focusOnInput();
 });
