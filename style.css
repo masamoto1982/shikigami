@@ -81,79 +81,10 @@ section:last-child {
     transition: background-color 0.3s;
 }
 
-/* Rich text editor styles */
-#txt-input.editor {
-    min-height: 80px;
-    height: 500px; /* Desktop default height */
-    max-height: 300px;
-    border: 1px solid #cccccc;
-    border-radius: 4px;
-    padding: 8px;
-    background-color: white;
-    overflow-y: auto;
-    font-family: monospace;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    line-height: 1.5;
-    outline: none;
-}
-
-/* Color buttons container */
-.color-buttons {
+/* Input areas container */
+#input-container {
     display: flex;
-    justify-content: center;
-    gap: 10px;
-    margin: 10px 0;
-}
-
-.color-btn {
-    padding: 8px 12px;
-    border: none;
-    border-radius: 4px;
-    font-size: 14px;
-    cursor: pointer;
-    transition: all 0.2s;
-    background-color: #f0f0f0;
-}
-
-.color-btn.active {
-    transform: scale(1.05);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-#color-black.active {
-    background-color: #333;
-    color: white;
-}
-
-#color-red, #color-red.active {
-    background-color: #ffebee;
-    color: #d32f2f;
-    border: 1px solid #ffcdd2;
-}
-
-#color-red.active {
-    background-color: #ffcdd2;
-}
-
-#color-green, #color-green.active {
-    background-color: #e8f5e9;
-    color: #2e7d32;
-    border: 1px solid #c8e6c9;
-}
-
-#color-green.active {
-    background-color: #c8e6c9;
-}
-
-#color-blue, #color-blue.active {
-    background-color: #e3f2fd;
-    color: #1976d2;
-    border: 1px solid #bbdefb;
-}
-
-#color-blue.active {
-    background-color: #bbdefb;
+    flex-direction: column;
 }
 
 #upper-half {
@@ -273,6 +204,16 @@ section:last-child {
     background-color: #9ca3af;
 }
 
+.special-button.long-pressed {
+    background-color: #fde68a;
+    transform: scale(0.95);
+}
+
+.special-button.combined-pressed {
+    background-color: #93c5fd;
+    transform: scale(0.95);
+}
+
 #special-row .dot.numeric {
     flex-shrink: 0;
 }
@@ -373,6 +314,12 @@ section:last-child {
     }
 }
 
+@keyframes feedback-pulse {
+    0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+    50% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+}
+
 /* Responsive layout */
 @media (max-width: 768px) {
     #mobile-container {
@@ -397,15 +344,11 @@ section:last-child {
 
     #output,
     #txt-input {
-        height: 100px;
+        height: 200px;
     }
 
     #txt-input {
         min-height: 6rem;
-    }
-	
-    #txt-input.editor {
-        height: 100px;
     }
 
     .hide {
@@ -438,6 +381,6 @@ section:last-child {
 
     #output,
     #txt-input {
-         height: 200px;
+         height: 500px;
     }
 }

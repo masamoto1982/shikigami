@@ -1,14 +1,16 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
-    <title>canvas</title>
+    <title>shikigami</title>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
     <article>
-        <h1>canvas ver.202505081034</h1>
+        <h1>shikigami ver.202505052000</h1>
 
         <div id="mobile-container">
             <div id="upper-half">
@@ -19,20 +21,11 @@
 
                 <section id="text-section" class="input-section">
                     <h2>txt-input</h2>
-                    
-                    <div id="txt-input" contenteditable="true" class="editor" spellcheck="false"></div>
-                    
+                    <textarea id="txt-input" rows="4" placeholder="Enter shikigami code..."></textarea>
                     <div class="button-container">
-                        <button id="clear-button">初期化</button>
-                        <button id="execute-button">実行</button>
-                    </div>
-                    
-                    <div class="color-buttons">
-                        <button id="color-black" class="color-btn active" data-color="black">黒</button>
-                        <button id="color-red" class="color-btn" data-color="red">赤 (Boolean)</button>
-                        <button id="color-green" class="color-btn" data-color="green">緑 (Number)</button>
-                        <button id="color-blue" class="color-btn" data-color="blue">青 (String)</button>
-                    </div>
+					<button id="clear-button">初期化</button>
+					<button id="execute-button">実行</button>
+					</div>
                 </section>
             </div>
 
@@ -47,6 +40,7 @@
         </div>
     </article>
 
-    <script type="module" src="js/main.js"></script>
+    <script src="script.js"></script>
 </body>
+
 </html>
